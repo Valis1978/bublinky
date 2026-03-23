@@ -1,7 +1,7 @@
 {
   "name": "Bublinky",
   "short_name": "Bublinky",
-  "description": "Tvoje appka na učení a povídání",
+  "description": "Učení, hry a zábava",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#FFF5F7",

@@ -31,7 +31,7 @@ const subjects = [
     icon: Globe,
     color: '#34D399',
     bg: 'linear-gradient(135deg, #ECFDF5, #D1FAE5)',
-    ready: false,
+    ready: true,
   },
   {
     id: 'science',
@@ -40,7 +40,7 @@ const subjects = [
     icon: Microscope,
     color: '#FBBF24',
     bg: 'linear-gradient(135deg, #FFFBEB, #FEF3C7)',
-    ready: false,
+    ready: true,
   },
 ];
 
