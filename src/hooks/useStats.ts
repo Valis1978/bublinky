@@ -1,0 +1,229 @@
+'use client';
+
+import { useState, useEffect, useCallback } from 'react';
+import {
+  getLevelFromXP,
+  getXPForNextLevel,
+  getLevelName,
+  getLevelEmoji,
+  calculateStreak,
+  XP_REWARDS,
+  ACHIEVEMENTS,
+  type Achievement,
+} from '@/lib/gamification';
+
+interface UserStats {
+  totalXP: number;
+  level: number;
+  levelName: string;
+  levelEmoji: string;
+  xpProgress: { current: number; needed: number; progress: number };
+  currentStreak: number;
+  longestStreak: number;
+  lastActivityDate: string | null;
+  sessionsCompleted: number;
+  correctAnswers: number;
+  gamesWon: number;
+  tasksCompleted: number;
+  unlockedAchievements: string[];
+}
+
+const DEFAULT_STATS: UserStats = {
+  totalXP: 0,
+  level: 1,
+  levelName: 'Začátečník',
+  levelEmoji: '🌱',
+  xpProgress: { current: 0, needed: 50, progress: 0 },
+  currentStreak: 0,
+  longestStreak: 0,
+  lastActivityDate: null,
+  sessionsCompleted: 0,
+  correctAnswers: 0,
+  gamesWon: 0,
+  tasksCompleted: 0,
+  unlockedAchievements: [],
+};
+
+export function useStats() {
+  const [stats, setStats] = useState<UserStats>(DEFAULT_STATS);
+  const [newAchievement, setNewAchievement] = useState<Achievement | null>(null);
+  const [levelUp, setLevelUp] = useState<number | null>(null);
+
+  // Load from localStorage
+  useEffect(() => {
+    const saved = localStorage.getItem('bub_stats');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        const level = getLevelFromXP(parsed.totalXP || 0);
+        setStats({
+          ...DEFAULT_STATS,
+          ...parsed,
+          level,
+          levelName: getLevelName(level),
+          levelEmoji: getLevelEmoji(level),
+          xpProgress: getXPForNextLevel(parsed.totalXP || 0),
+        });
+      } catch {
+        // ignore
+      }
+    }
+  }, []);
+
+  // Save to localStorage
+  const saveStats = useCallback((newStats: UserStats) => {
+    localStorage.setItem('bub_stats', JSON.stringify(newStats));
+    setStats(newStats);
+  }, []);
+
+  // Check achievements
+  const checkAchievements = useCallback(
+    (s: UserStats): string[] => {
+      const newUnlocks: string[] = [];
+      for (const achievement of ACHIEVEMENTS) {
+        if (s.unlockedAchievements.includes(achievement.id)) continue;
+
+        let unlocked = false;
+        switch (achievement.condition.type) {
+          case 'total_xp':
+            unlocked = s.totalXP >= achievement.condition.value;
+            break;
+          case 'level':
+            unlocked = s.level >= achievement.condition.value;
+            break;
+          case 'streak':
+            unlocked = s.currentStreak >= achievement.condition.value;
+            break;
+          case 'sessions_completed':
+            unlocked = s.sessionsCompleted >= achievement.condition.value;
+            break;
+          case 'games_won':
+            unlocked = s.gamesWon >= achievement.condition.value;
+            break;
+          case 'tasks_completed':
+            unlocked = s.tasksCompleted >= achievement.condition.value;
+            break;
+        }
+
+        if (unlocked) {
+          newUnlocks.push(achievement.id);
+        }
+      }
+      return newUnlocks;
+    },
+    []
+  );
+
+  // Add XP (called after correct answer, session, etc.)
+  const addXP = useCallback(
+    (amount: number, source?: string) => {
+      setStats((prev) => {
+        const oldLevel = prev.level;
+        const newXP = prev.totalXP + amount;
+        const newLevel = getLevelFromXP(newXP);
+
+        // Streak
+        const { newStreak } = calculateStreak(prev.lastActivityDate, prev.currentStreak);
+        const longestStreak = Math.max(prev.longestStreak, newStreak);
+        const streakBonus = newStreak > 1 ? XP_REWARDS.STREAK_BONUS : 0;
+        const finalXP = newXP + streakBonus;
+
+        const newStats: UserStats = {
+          ...prev,
+          totalXP: finalXP,
+          level: getLevelFromXP(finalXP),
+          levelName: getLevelName(getLevelFromXP(finalXP)),
+          levelEmoji: getLevelEmoji(getLevelFromXP(finalXP)),
+          xpProgress: getXPForNextLevel(finalXP),
+          currentStreak: newStreak,
+          longestStreak,
+          lastActivityDate: new Date().toISOString(),
+          correctAnswers: source === 'learn' ? prev.correctAnswers + 1 : prev.correctAnswers,
+        };
+
+        // Check level up
+        if (newLevel > oldLevel) {
+          setLevelUp(newLevel);
+          setTimeout(() => setLevelUp(null), 3000);
+        }
+
+        // Check achievements
+        const newUnlocks = checkAchievements(newStats);
+        if (newUnlocks.length > 0) {
+          newStats.unlockedAchievements = [...prev.unlockedAchievements, ...newUnlocks];
+          const achievement = ACHIEVEMENTS.find((a) => a.id === newUnlocks[0]);
+          if (achievement) {
+            setNewAchievement(achievement);
+            setTimeout(() => setNewAchievement(null), 3000);
+          }
+        }
+
+        saveStats(newStats);
+        return newStats;
+      });
+    },
+    [saveStats, checkAchievements]
+  );
+
+  // Complete a learning session
+  const completeSession = useCallback(
+    (correct: number, total: number) => {
+      const baseXP = correct * XP_REWARDS.CORRECT_ANSWER;
+      const perfectBonus = correct === total ? XP_REWARDS.PERFECT_SESSION : 0;
+
+      setStats((prev) => {
+        const isFirst = prev.sessionsCompleted === 0;
+        const firstBonus = isFirst ? XP_REWARDS.FIRST_SESSION : 0;
+
+        const newStats = {
+          ...prev,
+          sessionsCompleted: prev.sessionsCompleted + 1,
+          correctAnswers: prev.correctAnswers + correct,
+        };
+        saveStats(newStats);
+        return newStats;
+      });
+
+      const isFirst = stats.sessionsCompleted === 0;
+      addXP(baseXP + perfectBonus + (isFirst ? XP_REWARDS.FIRST_SESSION : 0), 'learn');
+    },
+    [addXP, saveStats, stats.sessionsCompleted]
+  );
+
+  // Win a game
+  const winGame = useCallback(() => {
+    setStats((prev) => {
+      const newStats = { ...prev, gamesWon: prev.gamesWon + 1 };
+      saveStats(newStats);
+      return newStats;
+    });
+    addXP(XP_REWARDS.GAME_WIN, 'game');
+  }, [addXP, saveStats]);
+
+  // Complete a task
+  const completeTask = useCallback(() => {
+    setStats((prev) => {
+      const newStats = { ...prev, tasksCompleted: prev.tasksCompleted + 1 };
+      saveStats(newStats);
+      return newStats;
+    });
+    addXP(5, 'task');
+  }, [addXP, saveStats]);
+
+  // Dismiss notifications
+  const dismissAchievement = useCallback(() => setNewAchievement(null), []);
+  const dismissLevelUp = useCallback(() => setLevelUp(null), []);
+
+  return {
+    stats,
+    addXP,
+    completeSession,
+    winGame,
+    completeTask,
+    newAchievement,
+    levelUp,
+    dismissAchievement,
+    dismissLevelUp,
+    allAchievements: ACHIEVEMENTS,
+  };
+}
