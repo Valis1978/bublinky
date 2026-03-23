@@ -1,84 +1,37 @@
 workflows:
   ios-capacitor:
-    name: iOS Build (Capacitor)
-    max_build_duration: 60
+    name: Capacitor iOS Workflow
+    max_build_duration: 120
     instance_type: mac_mini_m2
     integrations:
       app_store_connect: Bublinky
     environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: cz.bublinky.app
       vars:
-        BUNDLE_ID: "cz.bublinky.app"
         XCODE_SCHEME: "App"
-        TEAM_ID: "578588C5PF"
       node: 22
       xcode: latest
     scripts:
       - name: Install dependencies
-        script: npm ci
-      - name: Update Capacitor iOS project
-        script: npx cap sync ios
+        script: |
+          npm ci
+      - name: Build web and sync to iOS
+        script: |
+          npx cap sync ios
       - name: Set up code signing
         script: |
-          keychain initialize
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --create
-          keychain add-certificates
-
-          # Find provisioning profile
-          PROFILE_PATH=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1)
-          PROFILE_UUID=$(basename "$PROFILE_PATH" .mobileprovision)
-          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_PATH"))
-          echo "Profile UUID: $PROFILE_UUID"
-          echo "Profile Name: $PROFILE_NAME"
-          echo "PROFILE_UUID=$PROFILE_UUID" >> $CM_ENV
-          echo "PROFILE_NAME=$PROFILE_NAME" >> $CM_ENV
-
-          # Patch Xcode project to use the profile
-          PBXPROJ="ios/App/App.xcodeproj/project.pbxproj"
-          sed -i '' "s/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Manual;\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_NAME\";/" "$PBXPROJ"
-          sed -i '' "s/CODE_SIGN_IDENTITY = \"iPhone Developer\";/CODE_SIGN_IDENTITY = \"Apple Distribution\";/" "$PBXPROJ"
-          echo "Patched pbxproj with profile: $PROFILE_NAME"
-      - name: Build iOS app
+          xcode-project use-profiles
+      - name: Build IPA
         script: |
-          xcodebuild -project ios/App/App.xcodeproj \
-            -scheme "$XCODE_SCHEME" \
-            -configuration Release \
-            -sdk iphoneos \
-            -archivePath $CM_BUILD_DIR/build/App.xcarchive \
-            archive \
-            CODE_SIGN_STYLE=Manual \
-            DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME"
-      - name: Export IPA
-        script: |
-          cat > exportOptions.plist << 'PLIST'
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store</string>
-            <key>teamID</key>
-            <string>578588C5PF</string>
-            <key>signingStyle</key>
-            <string>manual</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>cz.bublinky.app</key>
-              <string>PROFILE_NAME_PLACEHOLDER</string>
-            </dict>
-          </dict>
-          </plist>
-          PLIST
-          sed -i '' "s/PROFILE_NAME_PLACEHOLDER/$PROFILE_NAME/" exportOptions.plist
-          xcodebuild -exportArchive \
-            -archivePath $CM_BUILD_DIR/build/App.xcarchive \
-            -exportOptionsPlist exportOptions.plist \
-            -exportPath $CM_BUILD_DIR/build/ios/ipa
+          xcode-project build-ipa \
+            --project "ios/App/App.xcodeproj" \
+            --scheme "$XCODE_SCHEME" \
+            --archive-flags="-destination 'generic/platform=iOS'"
     artifacts:
       - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
     publishing:
       app_store_connect:
         auth: integration
