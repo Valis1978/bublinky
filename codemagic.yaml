@@ -19,20 +19,12 @@ workflows:
       - name: Update Capacitor iOS project
         script: |
           npx cap sync ios
-      - name: Fetch signing files
+      - name: Set up keychain and signing
         script: |
+          keychain initialize
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
             --type IOS_APP_STORE \
             --create
-      - name: Use signing profiles
-        script: |
-          keychain initialize
-          app-store-connect certificates list \
-            --type IOS_DISTRIBUTION \
-            --save || \
-          app-store-connect certificates create \
-            --type IOS_DISTRIBUTION \
-            --save
           keychain add-certificates
           xcode-project use-profiles
       - name: Build iOS app
