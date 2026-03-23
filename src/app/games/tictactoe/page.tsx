@@ -10,78 +10,201 @@ import { useStats } from '@/hooks/useStats';
 import { createClient } from '@/lib/supabase/client';
 
 type Cell = 'X' | 'O' | null;
-type Board = Cell[];
 type GameMode = 'menu' | 'ai' | 'multi';
 
-const WINNING_LINES = [
-  [0, 1, 2], [3, 4, 5], [6, 7, 8],
-  [0, 3, 6], [1, 4, 7], [2, 5, 8],
-  [0, 4, 8], [2, 4, 6],
-];
+const SIZE = 15;
+const WIN_LENGTH = 5;
+const CELL_PX = 28; // pixel size per cell
 
-function checkWinner(board: Board): { winner: Cell; line: number[] | null } {
-  for (const [a, b, c] of WINNING_LINES) {
-    if (board[a] && board[a] === board[b] && board[a] === board[c]) {
-      return { winner: board[a], line: [a, b, c] };
+function createBoard(): Cell[][] {
+  return Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
+}
+
+// Check for 5 in a row from a specific position
+function checkWinAt(board: Cell[][], r: number, c: number): { winner: Cell; line: [number, number][] } | null {
+  const cell = board[r][c];
+  if (!cell) return null;
+
+  const directions = [
+    [0, 1],  // horizontal
+    [1, 0],  // vertical
+    [1, 1],  // diagonal \
+    [1, -1], // diagonal /
+  ];
+
+  for (const [dr, dc] of directions) {
+    const line: [number, number][] = [[r, c]];
+    // Forward
+    for (let i = 1; i < WIN_LENGTH; i++) {
+      const nr = r + dr * i;
+      const nc = c + dc * i;
+      if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE || board[nr][nc] !== cell) break;
+      line.push([nr, nc]);
+    }
+    // Backward
+    for (let i = 1; i < WIN_LENGTH; i++) {
+      const nr = r - dr * i;
+      const nc = c - dc * i;
+      if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE || board[nr][nc] !== cell) break;
+      line.push([nr, nc]);
+    }
+    if (line.length >= WIN_LENGTH) {
+      return { winner: cell, line };
+    }
+  }
+  return null;
+}
+
+function checkWinner(board: Cell[][]): { winner: Cell; line: [number, number][] | null } {
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      const result = checkWinAt(board, r, c);
+      if (result) return result;
     }
   }
   return { winner: null, line: null };
 }
 
-function getAIMove(board: Board): number {
-  const empty = board.map((c, i) => (c === null ? i : -1)).filter((i) => i >= 0);
-  for (const i of empty) { const t = [...board]; t[i] = 'O'; if (checkWinner(t).winner === 'O') return i; }
-  for (const i of empty) { const t = [...board]; t[i] = 'X'; if (checkWinner(t).winner === 'X') return i; }
-  if (board[4] === null) return 4;
-  const corners = [0, 2, 6, 8].filter((i) => board[i] === null);
-  if (corners.length > 0) return corners[Math.floor(Math.random() * corners.length)];
-  return empty[Math.floor(Math.random() * empty.length)];
+// AI: score positions based on patterns
+function scorePosition(board: Cell[][], r: number, c: number, player: Cell): number {
+  if (board[r][c] !== null) return -1;
+
+  let score = 0;
+  const opponent = player === 'X' ? 'O' : 'X';
+  const directions = [[0, 1], [1, 0], [1, 1], [1, -1]];
+
+  for (const [dr, dc] of directions) {
+    let myCount = 0;
+    let openEnds = 0;
+
+    // Count consecutive in both directions
+    for (let dir = -1; dir <= 1; dir += 2) {
+      let blocked = false;
+      for (let i = 1; i <= 4; i++) {
+        const nr = r + dr * i * dir;
+        const nc = c + dc * i * dir;
+        if (nr < 0 || nr >= SIZE || nc < 0 || nc >= SIZE) { blocked = true; break; }
+        if (board[nr][nc] === player) myCount++;
+        else if (board[nr][nc] === opponent) { blocked = true; break; }
+        else { if (i === 1) openEnds++; break; }
+      }
+      if (!blocked && myCount === 0) openEnds++;
+    }
+
+    // Score based on pattern
+    if (myCount >= 4) score += 100000; // Win
+    else if (myCount === 3 && openEnds >= 2) score += 10000; // Open 4
+    else if (myCount === 3) score += 1000;
+    else if (myCount === 2 && openEnds >= 2) score += 500;
+    else if (myCount === 2) score += 100;
+    else if (myCount === 1 && openEnds >= 2) score += 50;
+    else if (openEnds >= 1) score += 10;
+  }
+
+  // Center bonus
+  const centerDist = Math.abs(r - 7) + Math.abs(c - 7);
+  score += Math.max(0, 14 - centerDist);
+
+  return score;
+}
+
+function getAIMove(board: Cell[][]): [number, number] {
+  let bestScore = -1;
+  let bestMoves: [number, number][] = [];
+
+  // Only consider cells near existing pieces
+  const candidates = new Set<string>();
+  for (let r = 0; r < SIZE; r++) {
+    for (let c = 0; c < SIZE; c++) {
+      if (board[r][c] !== null) {
+        for (let dr = -2; dr <= 2; dr++) {
+          for (let dc = -2; dc <= 2; dc++) {
+            const nr = r + dr;
+            const nc = c + dc;
+            if (nr >= 0 && nr < SIZE && nc >= 0 && nc < SIZE && board[nr][nc] === null) {
+              candidates.add(`${nr},${nc}`);
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // If empty board, play center
+  if (candidates.size === 0) return [7, 7];
+
+  for (const key of candidates) {
+    const [r, c] = key.split(',').map(Number);
+
+    // Score for AI (offensive) + score for blocking player (defensive)
+    const offensiveScore = scorePosition(board, r, c, 'O');
+    const defensiveScore = scorePosition(board, r, c, 'X');
+    const total = offensiveScore + defensiveScore * 0.9; // Slightly prefer offense
+
+    if (total > bestScore) {
+      bestScore = total;
+      bestMoves = [[r, c]];
+    } else if (total === bestScore) {
+      bestMoves.push([r, c]);
+    }
+  }
+
+  return bestMoves[Math.floor(Math.random() * bestMoves.length)];
 }
 
 export default function TicTacToePage() {
   const { user } = useAuth();
   const { winGame } = useStats();
   const [mode, setMode] = useState<GameMode>('menu');
-  const [board, setBoard] = useState<Board>(Array(9).fill(null));
+  const [board, setBoard] = useState<Cell[][]>(createBoard());
   const [isPlayerTurn, setIsPlayerTurn] = useState(true);
   const [scores, setScores] = useState({ player: 0, opponent: 0, draws: 0 });
-  const [multiStatus, setMultiStatus] = useState<'waiting' | 'playing' | 'disconnected'>('waiting');
+  const [lastMove, setLastMove] = useState<[number, number] | null>(null);
+  const [multiStatus, setMultiStatus] = useState<'waiting' | 'playing'>('waiting');
   const [mySymbol, setMySymbol] = useState<'X' | 'O'>('X');
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null);
+  const boardRef = useRef<HTMLDivElement>(null);
 
   const { winner, line } = checkWinner(board);
-  const isDraw = !winner && board.every((c) => c !== null);
-  const gameOver = !!winner || isDraw;
+  const gameOver = !!winner;
 
-  // Multiplayer: Supabase Broadcast
+  // Scroll to last move
+  useEffect(() => {
+    if (lastMove && boardRef.current) {
+      const cell = boardRef.current.querySelector(`[data-pos="${lastMove[0]}-${lastMove[1]}"]`);
+      cell?.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+    }
+  }, [lastMove]);
+
+  // Multiplayer
   useEffect(() => {
     if (mode !== 'multi') return;
-
     const supabase = createClient();
-    const channel = supabase.channel('bub-tictactoe', {
+    const channel = supabase.channel('bub-tictactoe-v2', {
       config: { broadcast: { self: false } },
     });
 
     channel
       .on('broadcast', { event: 'move' }, ({ payload }) => {
-        const { index, symbol } = payload as { index: number; symbol: 'X' | 'O' };
+        const { row, col, symbol } = payload as { row: number; col: number; symbol: 'X' | 'O' };
         setBoard((prev) => {
-          const newBoard = [...prev];
-          newBoard[index] = symbol;
+          const newBoard = prev.map((r) => [...r]);
+          newBoard[row][col] = symbol;
           return newBoard;
         });
+        setLastMove([row, col]);
         setIsPlayerTurn(true);
       })
       .on('broadcast', { event: 'reset' }, () => {
-        setBoard(Array(9).fill(null));
+        setBoard(createBoard());
+        setLastMove(null);
         setIsPlayerTurn(true);
       })
       .on('broadcast', { event: 'join' }, ({ payload }) => {
         setMultiStatus('playing');
-        // Second player gets O
         if (payload?.role !== user?.role) {
           setMySymbol(user?.role === 'child' ? 'X' : 'O');
-          setIsPlayerTurn(user?.role === 'child'); // Child goes first
+          setIsPlayerTurn(user?.role === 'child');
         }
       })
       .subscribe((status) => {
@@ -92,97 +215,86 @@ export default function TicTacToePage() {
       });
 
     channelRef.current = channel;
-
-    return () => {
-      supabase.removeChannel(channel);
-      channelRef.current = null;
-    };
+    return () => { supabase.removeChannel(channel); channelRef.current = null; };
   }, [mode, user?.role]);
 
   const handleCellClick = useCallback(
-    (index: number) => {
-      if (board[index] || !isPlayerTurn || gameOver) return;
+    (r: number, c: number) => {
+      if (board[r][c] || !isPlayerTurn || gameOver) return;
 
       if (mode === 'ai') {
-        // AI mode
-        const newBoard = [...board];
-        newBoard[index] = 'X';
-        const result = checkWinner(newBoard);
+        const newBoard = board.map((row) => [...row]);
+        newBoard[r][c] = 'X';
+        setBoard(newBoard);
+        setLastMove([r, c]);
 
-        if (result.winner || newBoard.every((c) => c !== null)) {
-          setBoard(newBoard);
-          if (result.winner === 'X') { winGame(); setScores((s) => ({ ...s, player: s.player + 1 })); }
-          else if (!result.winner) setScores((s) => ({ ...s, draws: s.draws + 1 }));
+        const result = checkWinner(newBoard);
+        if (result.winner === 'X') {
+          winGame();
+          setScores((s) => ({ ...s, player: s.player + 1 }));
           return;
         }
 
-        setBoard(newBoard);
         setIsPlayerTurn(false);
-
         setTimeout(() => {
-          const aiIndex = getAIMove(newBoard);
-          const aiBoard = [...newBoard];
-          aiBoard[aiIndex] = 'O';
+          const [ar, ac] = getAIMove(newBoard);
+          const aiBoard = newBoard.map((row) => [...row]);
+          aiBoard[ar][ac] = 'O';
           setBoard(aiBoard);
+          setLastMove([ar, ac]);
           setIsPlayerTurn(true);
+
           const aiResult = checkWinner(aiBoard);
-          if (aiResult.winner === 'O') setScores((s) => ({ ...s, opponent: s.opponent + 1 }));
-          else if (aiBoard.every((c) => c !== null) && !aiResult.winner)
-            setScores((s) => ({ ...s, draws: s.draws + 1 }));
-        }, 400);
+          if (aiResult.winner === 'O') {
+            setScores((s) => ({ ...s, opponent: s.opponent + 1 }));
+          }
+        }, 300);
       } else {
-        // Multiplayer mode
-        const newBoard = [...board];
-        newBoard[index] = mySymbol;
+        const newBoard = board.map((row) => [...row]);
+        newBoard[r][c] = mySymbol;
         setBoard(newBoard);
+        setLastMove([r, c]);
         setIsPlayerTurn(false);
 
         channelRef.current?.send({
           type: 'broadcast',
           event: 'move',
-          payload: { index, symbol: mySymbol },
+          payload: { row: r, col: c, symbol: mySymbol },
         });
 
         const result = checkWinner(newBoard);
         if (result.winner === mySymbol) { winGame(); setScores((s) => ({ ...s, player: s.player + 1 })); }
         else if (result.winner) setScores((s) => ({ ...s, opponent: s.opponent + 1 }));
-        else if (newBoard.every((c) => c !== null)) setScores((s) => ({ ...s, draws: s.draws + 1 }));
       }
     },
     [board, isPlayerTurn, gameOver, mode, mySymbol, winGame]
   );
 
   const reset = () => {
-    setBoard(Array(9).fill(null));
+    setBoard(createBoard());
+    setLastMove(null);
     setIsPlayerTurn(mode === 'ai' || mySymbol === 'X');
     if (mode === 'multi') {
       channelRef.current?.send({ type: 'broadcast', event: 'reset', payload: {} });
     }
   };
 
-  // Mode selection menu
+  // Mode menu
   if (mode === 'menu') {
     return (
       <div className="flex flex-col h-dvh">
         <div className="flex-1 flex flex-col items-center justify-center p-6 pb-24 gap-6">
-          <div className="flex items-center gap-3 self-start absolute top-4 left-4">
+          <div className="absolute top-4 left-4">
             <Link href="/games" className="p-2" style={{ color: 'var(--text-muted)' }}>
               <ArrowLeft size={20} />
             </Link>
           </div>
+          <h1 className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>Piškvorky</h1>
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>15×15, pět v řadě</p>
 
-          <h1 className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>
-            Piškvorky
-          </h1>
-
-          <button
-            onClick={() => setMode('ai')}
-            className="w-full max-w-xs glass-card p-5 flex items-center gap-4 transition-transform active:scale-[0.98]"
-          >
-            <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center"
-              style={{ background: 'var(--accent-soft)' }}
-            >
+          <button onClick={() => setMode('ai')}
+            className="w-full max-w-xs glass-card p-5 flex items-center gap-4 transition-transform active:scale-[0.98]">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'var(--accent-soft)' }}>
               <Bot size={24} style={{ color: 'var(--accent)' }} />
             </div>
             <div className="text-left">
@@ -191,14 +303,9 @@ export default function TicTacToePage() {
             </div>
           </button>
 
-          <button
-            onClick={() => setMode('multi')}
-            className="w-full max-w-xs glass-card p-5 flex items-center gap-4 transition-transform active:scale-[0.98]"
-          >
-            <div
-              className="w-12 h-12 rounded-xl flex items-center justify-center"
-              style={{ background: 'linear-gradient(135deg, #3B82F620, #10B98120)' }}
-            >
+          <button onClick={() => setMode('multi')}
+            className="w-full max-w-xs glass-card p-5 flex items-center gap-4 transition-transform active:scale-[0.98]">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #3B82F620, #10B98120)' }}>
               <Users size={24} style={{ color: '#3B82F6' }} />
             </div>
             <div className="text-left">
@@ -212,110 +319,105 @@ export default function TicTacToePage() {
     );
   }
 
+  const winSet = new Set(line?.map(([r, c]) => `${r}-${c}`) || []);
   const opponentName = mode === 'ai' ? 'AI' : 'Táta';
-  const myName = user?.role === 'child' ? 'Ty' : 'Ty';
 
   return (
     <div className="flex flex-col h-dvh">
-      <div className="flex-1 overflow-y-auto p-4 pb-24 safe-top">
-        <div className="flex items-center gap-3 mb-6">
+      <div className="flex-1 flex flex-col p-2 pb-24 safe-top">
+        {/* Header */}
+        <div className="flex items-center justify-between px-2 mb-2">
           <button onClick={() => setMode('menu')} style={{ color: 'var(--text-muted)' }}>
             <ArrowLeft size={20} />
           </button>
-          <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
-            Piškvorky {mode === 'multi' && '(multiplayer)'}
-          </h1>
-        </div>
-
-        {/* Multiplayer status */}
-        {mode === 'multi' && multiStatus === 'waiting' && (
-          <div className="glass-card p-4 mb-4 text-center">
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-              className="w-6 h-6 border-2 border-t-transparent rounded-full mx-auto mb-2"
-              style={{ borderColor: 'var(--accent)', borderTopColor: 'transparent' }}
-            />
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-              Čekám na druhého hráče...
-            </p>
+          <div className="flex gap-4 text-center">
+            <div>
+              <span className="text-lg font-bold" style={{ color: 'var(--rose)' }}>{scores.player}</span>
+              <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>Ty</p>
+            </div>
+            <div>
+              <span className="text-lg font-bold" style={{ color: 'var(--lavender)' }}>{scores.opponent}</span>
+              <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>{opponentName}</p>
+            </div>
           </div>
-        )}
-
-        {/* Scoreboard */}
-        <div className="flex justify-center gap-6 mb-6">
-          <div className="text-center">
-            <p className="text-2xl font-bold" style={{ color: 'var(--rose)' }}>{scores.player}</p>
-            <p className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>
-              {myName} ({mode === 'multi' ? mySymbol : 'X'})
-            </p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold" style={{ color: 'var(--text-muted)' }}>{scores.draws}</p>
-            <p className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>Remíza</p>
-          </div>
-          <div className="text-center">
-            <p className="text-2xl font-bold" style={{ color: 'var(--lavender)' }}>{scores.opponent}</p>
-            <p className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>
-              {opponentName} ({mode === 'multi' ? (mySymbol === 'X' ? 'O' : 'X') : 'O'})
-            </p>
-          </div>
-        </div>
-
-        {/* Board */}
-        <div className="flex justify-center mb-6">
-          <div className="grid grid-cols-3 gap-2 p-3 rounded-2xl" style={{ background: 'var(--bg-secondary)' }}>
-            {board.map((cell, i) => {
-              const isWinning = line?.includes(i);
-              return (
-                <motion.button
-                  key={i}
-                  whileTap={!cell && isPlayerTurn && !gameOver ? { scale: 0.9 } : {}}
-                  onClick={() => handleCellClick(i)}
-                  className="w-24 h-24 rounded-xl flex items-center justify-center text-4xl font-bold transition-all"
-                  style={{
-                    background: isWinning ? 'var(--accent-gradient)' : 'var(--bg-card)',
-                    boxShadow: isWinning ? 'var(--shadow-lg)' : 'var(--shadow)',
-                    color: cell === 'X' ? 'var(--rose)' : 'var(--lavender)',
-                  }}
-                >
-                  {cell && (
-                    <motion.span
-                      initial={{ scale: 0, rotate: -180 }}
-                      animate={{ scale: 1, rotate: 0 }}
-                      transition={{ type: 'spring', stiffness: 300 }}
-                    >
-                      {cell}
-                    </motion.span>
-                  )}
-                </motion.button>
-              );
-            })}
-          </div>
+          <button onClick={reset} style={{ color: 'var(--text-muted)' }}>
+            <RotateCcw size={18} />
+          </button>
         </div>
 
         {/* Status */}
-        <div className="text-center mb-4">
+        <div className="text-center mb-1">
           {gameOver ? (
-            <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="space-y-3">
-              <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
-                {winner === (mode === 'multi' ? mySymbol : 'X')
-                  ? '🎉 Vyhrála jsi!'
-                  : winner
-                    ? `${opponentName} vyhrál!`
-                    : '🤝 Remíza!'}
-              </p>
-              <button onClick={reset} className="accent-button px-6 py-2.5 text-sm inline-flex items-center gap-2">
-                <RotateCcw size={16} />
-                Znovu
-              </button>
-            </motion.div>
+            <p className="text-sm font-bold" style={{ color: 'var(--accent)' }}>
+              {winner === (mode === 'multi' ? mySymbol : 'X') ? '🎉 Vyhrála jsi!' : `${opponentName} vyhrál!`}
+            </p>
           ) : (
-            <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
               {isPlayerTurn ? 'Tvůj tah' : mode === 'ai' ? 'AI přemýšlí...' : 'Čekám na tátu...'}
             </p>
           )}
         </div>
+
+        {/* Board — scrollable */}
+        <div
+          ref={boardRef}
+          className="flex-1 overflow-auto rounded-xl"
+          style={{ background: 'var(--bg-secondary)', touchAction: 'pan-x pan-y' }}
+        >
+          <div
+            className="inline-grid gap-px p-1"
+            style={{
+              gridTemplateColumns: `repeat(${SIZE}, ${CELL_PX}px)`,
+              gridTemplateRows: `repeat(${SIZE}, ${CELL_PX}px)`,
+            }}
+          >
+            {board.map((row, r) =>
+              row.map((cell, c) => {
+                const isWin = winSet.has(`${r}-${c}`);
+                const isLast = lastMove?.[0] === r && lastMove?.[1] === c;
+                return (
+                  <button
+                    key={`${r}-${c}`}
+                    data-pos={`${r}-${c}`}
+                    onClick={() => handleCellClick(r, c)}
+                    className="flex items-center justify-center text-sm font-bold rounded-sm transition-all"
+                    style={{
+                      width: CELL_PX,
+                      height: CELL_PX,
+                      background: isWin
+                        ? 'var(--accent)'
+                        : isLast
+                          ? 'var(--accent-soft)'
+                          : 'var(--bg-card)',
+                      color: cell === 'X' ? 'var(--rose)' : cell === 'O' ? 'var(--lavender)' : 'transparent',
+                      border: isLast ? '2px solid var(--accent)' : 'none',
+                    }}
+                  >
+                    {cell && (
+                      <motion.span
+                        initial={{ scale: 0 }}
+                        animate={{ scale: 1 }}
+                        transition={{ type: 'spring', stiffness: 400, damping: 15 }}
+                      >
+                        {cell}
+                      </motion.span>
+                    )}
+                  </button>
+                );
+              })
+            )}
+          </div>
+        </div>
+
+        {/* Game over button */}
+        {gameOver && (
+          <div className="text-center mt-2">
+            <button onClick={reset} className="accent-button px-6 py-2 text-sm inline-flex items-center gap-2">
+              <RotateCcw size={14} />
+              Nová hra
+            </button>
+          </div>
+        )}
       </div>
       <BottomNav />
     </div>
