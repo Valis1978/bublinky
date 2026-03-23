@@ -9,6 +9,7 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: cz.bublinky.app
+        certificate: Apple Distribution
       vars:
         XCODE_WORKSPACE: "ios/App/App.xcworkspace"
         XCODE_SCHEME: "App"
@@ -22,9 +23,6 @@ workflows:
       - name: Update Capacitor iOS project
         script: |
           npx cap sync ios
-      - name: Install CocoaPods
-        script: |
-          cd ios/App && pod install
       - name: Set up code signing
         script: |
           xcode-project use-profiles
