@@ -9,17 +9,14 @@ workflows:
       vars:
         BUNDLE_ID: "cz.bublinky.app"
         XCODE_SCHEME: "App"
-        APP_STORE_CONNECT_ISSUER_ID: "ca0ef91e-65b4-4adc-a452-d5c1b590e884"
-        APP_STORE_CONNECT_KEY_IDENTIFIER: "SPU39S48DJ"
+        TEAM_ID: "578588C5PF"
       node: 22
       xcode: latest
     scripts:
       - name: Install dependencies
-        script: |
-          npm ci
+        script: npm ci
       - name: Update Capacitor iOS project
-        script: |
-          npx cap sync ios
+        script: npx cap sync ios
       - name: Set up code signing
         script: |
           keychain initialize
@@ -27,15 +24,59 @@ workflows:
             --type IOS_APP_STORE \
             --create
           keychain add-certificates
-          xcode-project use-profiles --project "ios/App/App.xcodeproj"
+
+          # Find provisioning profile UUID
+          PROFILE_UUID=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1 | xargs basename | sed 's/.mobileprovision//')
+          echo "Found profile UUID: $PROFILE_UUID"
+
+          # Find profile name
+          PROFILE_PATH=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1)
+          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_PATH"))
+          echo "Found profile name: $PROFILE_NAME"
+
+          # Export for next steps
+          echo "PROFILE_UUID=$PROFILE_UUID" >> $CM_ENV
+          echo "PROFILE_NAME=$PROFILE_NAME" >> $CM_ENV
       - name: Build iOS app
         script: |
-          xcode-project build-ipa \
-            --project "ios/App/App.xcodeproj" \
-            --scheme "$XCODE_SCHEME"
+          xcodebuild -project ios/App/App.xcodeproj \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath $CM_BUILD_DIR/build/App.xcarchive \
+            archive \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM="$TEAM_ID" \
+            CODE_SIGN_IDENTITY="Apple Distribution" \
+            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME"
+      - name: Export IPA
+        script: |
+          cat > exportOptions.plist << 'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>teamID</key>
+            <string>578588C5PF</string>
+            <key>signingStyle</key>
+            <string>manual</string>
+            <key>provisioningProfiles</key>
+            <dict>
+              <key>cz.bublinky.app</key>
+              <string>PROFILE_NAME_PLACEHOLDER</string>
+            </dict>
+          </dict>
+          </plist>
+          PLIST
+          sed -i '' "s/PROFILE_NAME_PLACEHOLDER/$PROFILE_NAME/" exportOptions.plist
+          xcodebuild -exportArchive \
+            -archivePath $CM_BUILD_DIR/build/App.xcarchive \
+            -exportOptionsPlist exportOptions.plist \
+            -exportPath $CM_BUILD_DIR/build/ios/ipa
     artifacts:
       - build/ios/ipa/*.ipa
-      - build/ios/App.xcarchive
     publishing:
       app_store_connect:
         auth: integration
