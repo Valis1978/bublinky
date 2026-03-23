@@ -25,18 +25,20 @@ workflows:
             --create
           keychain add-certificates
 
-          # Find provisioning profile UUID
-          PROFILE_UUID=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1 | xargs basename | sed 's/.mobileprovision//')
-          echo "Found profile UUID: $PROFILE_UUID"
-
-          # Find profile name
+          # Find provisioning profile
           PROFILE_PATH=$(ls ~/Library/MobileDevice/Provisioning\ Profiles/*.mobileprovision | head -1)
+          PROFILE_UUID=$(basename "$PROFILE_PATH" .mobileprovision)
           PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" /dev/stdin <<< $(/usr/bin/security cms -D -i "$PROFILE_PATH"))
-          echo "Found profile name: $PROFILE_NAME"
-
-          # Export for next steps
+          echo "Profile UUID: $PROFILE_UUID"
+          echo "Profile Name: $PROFILE_NAME"
           echo "PROFILE_UUID=$PROFILE_UUID" >> $CM_ENV
           echo "PROFILE_NAME=$PROFILE_NAME" >> $CM_ENV
+
+          # Patch Xcode project to use the profile
+          PBXPROJ="ios/App/App.xcodeproj/project.pbxproj"
+          sed -i '' "s/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Manual;\n\t\t\t\tPROVISIONING_PROFILE_SPECIFIER = \"$PROFILE_NAME\";/" "$PBXPROJ"
+          sed -i '' "s/CODE_SIGN_IDENTITY = \"iPhone Developer\";/CODE_SIGN_IDENTITY = \"Apple Distribution\";/" "$PBXPROJ"
+          echo "Patched pbxproj with profile: $PROFILE_NAME"
       - name: Build iOS app
         script: |
           xcodebuild -project ios/App/App.xcodeproj \
