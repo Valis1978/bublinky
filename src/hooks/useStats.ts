@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import {
   getLevelFromXP,
   getXPForNextLevel,
@@ -44,37 +44,127 @@ const DEFAULT_STATS: UserStats = {
   unlockedAchievements: [],
 };
 
+function enrichStats(raw: Partial<UserStats>): UserStats {
+  const totalXP = raw.totalXP ?? 0;
+  const level = getLevelFromXP(totalXP);
+  return {
+    ...DEFAULT_STATS,
+    ...raw,
+    level,
+    levelName: getLevelName(level),
+    levelEmoji: getLevelEmoji(level),
+    xpProgress: getXPForNextLevel(totalXP),
+  };
+}
+
+// Debounced DB sync — saves at most once per 2 seconds
+function useDebouncedDBSync() {
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const syncToDB = useCallback((userId: string, stats: UserStats) => {
+    if (timerRef.current) clearTimeout(timerRef.current);
+    timerRef.current = setTimeout(async () => {
+      try {
+        await fetch('/api/stats', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, stats }),
+        });
+      } catch {
+        // Silently fail — localStorage is primary, DB is backup
+      }
+    }, 2000);
+  }, []);
+
+  return syncToDB;
+}
+
 export function useStats() {
   const [stats, setStats] = useState<UserStats>(DEFAULT_STATS);
   const [newAchievement, setNewAchievement] = useState<Achievement | null>(null);
   const [levelUp, setLevelUp] = useState<number | null>(null);
+  const [loaded, setLoaded] = useState(false);
+  const syncToDB = useDebouncedDBSync();
 
-  // Load from localStorage
+  // Get current user ID from localStorage
+  const getUserId = useCallback((): string | null => {
+    try {
+      const user = localStorage.getItem('bub_user');
+      if (user) {
+        const parsed = JSON.parse(user);
+        return parsed.id || null;
+      }
+    } catch { /* ignore */ }
+    return null;
+  }, []);
+
+  // Load: localStorage first (instant), then DB (background merge)
   useEffect(() => {
+    // 1. Load from localStorage (instant)
     const saved = localStorage.getItem('bub_stats');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        const level = getLevelFromXP(parsed.totalXP || 0);
-        setStats({
-          ...DEFAULT_STATS,
-          ...parsed,
-          level,
-          levelName: getLevelName(level),
-          levelEmoji: getLevelEmoji(level),
-          xpProgress: getXPForNextLevel(parsed.totalXP || 0),
-        });
-      } catch {
-        // ignore
-      }
+        setStats(enrichStats(parsed));
+      } catch { /* ignore */ }
     }
-  }, []);
 
-  // Save to localStorage
+    // 2. Load from DB (async, merge with higher values)
+    const userId = getUserId();
+    if (userId) {
+      fetch(`/api/stats?userId=${userId}`)
+        .then(res => res.json())
+        .then(dbData => {
+          if (dbData && typeof dbData.total_xp === 'number') {
+            // Convert DB snake_case to camelCase
+            const dbStats: Partial<UserStats> = {
+              totalXP: dbData.total_xp,
+              currentStreak: dbData.current_streak,
+              longestStreak: dbData.longest_streak,
+              lastActivityDate: dbData.last_activity_date,
+              sessionsCompleted: dbData.sessions_completed,
+              correctAnswers: dbData.correct_answers,
+              gamesWon: dbData.games_won,
+              tasksCompleted: dbData.tasks_completed,
+              unlockedAchievements: dbData.unlocked_achievements || [],
+            };
+
+            // Merge: take the MAX of each numeric field
+            setStats(prev => {
+              const merged = enrichStats({
+                totalXP: Math.max(prev.totalXP, dbStats.totalXP ?? 0),
+                currentStreak: Math.max(prev.currentStreak, dbStats.currentStreak ?? 0),
+                longestStreak: Math.max(prev.longestStreak, dbStats.longestStreak ?? 0),
+                lastActivityDate: prev.lastActivityDate && dbStats.lastActivityDate
+                  ? (new Date(prev.lastActivityDate) > new Date(dbStats.lastActivityDate) ? prev.lastActivityDate : dbStats.lastActivityDate)
+                  : prev.lastActivityDate || dbStats.lastActivityDate || null,
+                sessionsCompleted: Math.max(prev.sessionsCompleted, dbStats.sessionsCompleted ?? 0),
+                correctAnswers: Math.max(prev.correctAnswers, dbStats.correctAnswers ?? 0),
+                gamesWon: Math.max(prev.gamesWon, dbStats.gamesWon ?? 0),
+                tasksCompleted: Math.max(prev.tasksCompleted, dbStats.tasksCompleted ?? 0),
+                unlockedAchievements: [...new Set([...prev.unlockedAchievements, ...(dbStats.unlockedAchievements ?? [])])],
+              });
+              localStorage.setItem('bub_stats', JSON.stringify(merged));
+              return merged;
+            });
+          }
+        })
+        .catch(() => { /* offline — use localStorage */ });
+    }
+
+    setLoaded(true);
+  }, [getUserId]);
+
+  // Save to localStorage + schedule DB sync
   const saveStats = useCallback((newStats: UserStats) => {
     localStorage.setItem('bub_stats', JSON.stringify(newStats));
     setStats(newStats);
-  }, []);
+
+    const userId = getUserId();
+    if (userId) {
+      syncToDB(userId, newStats);
+    }
+  }, [getUserId, syncToDB]);
 
   // Check achievements
   const checkAchievements = useCallback(
@@ -114,13 +204,12 @@ export function useStats() {
     []
   );
 
-  // Add XP (called after correct answer, session, etc.)
+  // Add XP
   const addXP = useCallback(
     (amount: number, source?: string) => {
       setStats((prev) => {
         const oldLevel = prev.level;
         const newXP = prev.totalXP + amount;
-        const newLevel = getLevelFromXP(newXP);
 
         // Streak
         const { newStreak } = calculateStreak(prev.lastActivityDate, prev.currentStreak);
@@ -142,6 +231,7 @@ export function useStats() {
         };
 
         // Check level up
+        const newLevel = getLevelFromXP(finalXP);
         if (newLevel > oldLevel) {
           setLevelUp(newLevel);
           setTimeout(() => setLevelUp(null), 3000);
@@ -216,6 +306,7 @@ export function useStats() {
 
   return {
     stats,
+    loaded,
     addXP,
     completeSession,
     winGame,
