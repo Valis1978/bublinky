@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Nunito, Inter } from 'next/font/google';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
+import { ActivityTracker } from '@/components/providers/ActivityTracker';
 import './globals.css';
 
 const nunito = Nunito({
@@ -52,7 +53,10 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
       </head>
       <body className="min-h-dvh flex flex-col">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <ActivityTracker />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );
