@@ -19,16 +19,24 @@ export async function middleware(request: NextRequest) {
   }
 
   const token = request.cookies.get('bub_session')?.value;
+  const isApiRoute = pathname.startsWith('/api/');
 
   if (!token) {
+    if (isApiRoute) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
     return NextResponse.redirect(new URL('/login', request.url));
   }
 
   const session = await verifySession(token);
 
   if (!session) {
-    const response = NextResponse.redirect(new URL('/login', request.url));
-    response.cookies.set('bub_session', '', { maxAge: 0, path: '/' });
+    const response = isApiRoute
+      ? NextResponse.json({ error: 'Session expired' }, { status: 401 })
+      : NextResponse.redirect(new URL('/login', request.url));
+    if (!isApiRoute) {
+      response.cookies.set('bub_session', '', { maxAge: 0, path: '/' });
+    }
     return response;
   }
 

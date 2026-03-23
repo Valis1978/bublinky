@@ -25,7 +25,7 @@ export default function TasksPage() {
 
   return (
     <div className="flex flex-col h-dvh">
-      <div className="flex-1 overflow-y-auto p-4 pb-24 safe-top">
+      <div className="flex-1 overflow-y-auto p-4 pb-nav safe-top">
         {/* Header */}
         <div className="flex items-center justify-between mb-4">
           <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>

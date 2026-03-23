@@ -58,7 +58,7 @@ export default function ProfilePage() {
         )}
       </AnimatePresence>
 
-      <div className="flex-1 overflow-y-auto p-4 pb-24 safe-top">
+      <div className="flex-1 overflow-y-auto p-4 pb-nav safe-top">
         <h1 className="text-2xl font-bold mb-6" style={{ color: 'var(--text-primary)' }}>
           Profil
         </h1>

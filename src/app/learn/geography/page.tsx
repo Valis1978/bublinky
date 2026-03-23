@@ -57,7 +57,7 @@ export default function GeographyPage() {
   const catData = ALL_GEO_CATEGORIES.find((c) => c.id === category);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-teal-50 pb-20">
+    <div className="min-h-screen bg-gradient-to-b from-emerald-50 to-teal-50 pb-nav">
       <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-lg border-b border-emerald-100 px-4 py-3">
         <div className="flex items-center gap-3">
           <Link

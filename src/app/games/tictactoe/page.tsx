@@ -14,7 +14,7 @@ type GameMode = 'menu' | 'ai' | 'multi';
 
 const SIZE = 15;
 const WIN_LENGTH = 5;
-const CELL_PX = 28; // pixel size per cell
+const CELL_PX = 24; // pixel size per cell — 15*24=360 fits iPhone 375px
 
 function createBoard(): Cell[][] {
   return Array.from({ length: SIZE }, () => Array(SIZE).fill(null));
@@ -283,7 +283,7 @@ export default function TicTacToePage() {
   if (mode === 'menu') {
     return (
       <div className="flex flex-col h-dvh">
-        <div className="flex-1 flex flex-col items-center justify-center p-6 pb-24 gap-6">
+        <div className="flex-1 flex flex-col items-center justify-center p-6 pb-nav gap-6">
           <div className="absolute top-4 left-4">
             <Link href="/games" className="p-2" style={{ color: 'var(--text-muted)' }}>
               <ArrowLeft size={20} />
@@ -324,7 +324,7 @@ export default function TicTacToePage() {
 
   return (
     <div className="flex flex-col h-dvh">
-      <div className="flex-1 flex flex-col p-2 pb-24 safe-top">
+      <div className="flex-1 flex flex-col p-2 pb-nav safe-top">
         {/* Header */}
         <div className="flex items-center justify-between px-2 mb-2">
           <button onClick={() => setMode('menu')} style={{ color: 'var(--text-muted)' }}>

@@ -142,6 +142,11 @@
   .safe-top {
     padding-top: max(0.5rem, env(safe-area-inset-top));
   }
+
+  /* Content padding to clear BottomNav (64px) + safe area */
+  .pb-nav {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
+  }
 }
 
 ::-webkit-scrollbar {

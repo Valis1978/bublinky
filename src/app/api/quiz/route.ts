@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-const MODEL = 'gemini-2.0-flash';
+const MODEL = 'gemini-2.0-flash-lite';
 
 interface QuizQuestion {
   question: string;

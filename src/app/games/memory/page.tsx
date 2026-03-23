@@ -126,7 +126,7 @@ export default function MemoryPage() {
 
   return (
     <div className="flex flex-col h-dvh">
-      <div className="flex-1 overflow-y-auto p-4 pb-24 safe-top">
+      <div className="flex-1 overflow-y-auto p-4 pb-nav safe-top">
         <div className="flex items-center gap-3 mb-4">
           <Link href="/games" className="p-2 -ml-2" style={{ color: 'var(--text-muted)' }}>
             <ArrowLeft size={20} />

@@ -103,7 +103,7 @@ export default function AIQuizPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-violet-50 to-pink-50 pb-20">
+    <div className="min-h-screen bg-gradient-to-b from-violet-50 to-pink-50 pb-nav">
       {/* Header */}
       <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-lg border-b border-violet-100 px-4 py-3">
         <div className="flex items-center gap-3">

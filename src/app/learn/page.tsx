@@ -47,7 +47,7 @@ const subjects = [
 export default function LearnPage() {
   return (
     <div className="flex flex-col h-dvh">
-      <div className="flex-1 overflow-y-auto p-4 pb-24 safe-top">
+      <div className="flex-1 overflow-y-auto p-4 pb-nav safe-top">
         <h1 className="text-2xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
           Učení
         </h1>

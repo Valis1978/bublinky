@@ -65,7 +65,7 @@ export default function CzechPage() {
   if (screen === 'menu') {
     return (
       <div className="flex flex-col h-dvh">
-        <div className="flex-1 overflow-y-auto p-4 pb-24 safe-top">
+        <div className="flex-1 overflow-y-auto p-4 pb-nav safe-top">
           <div className="flex items-center gap-3 mb-6">
             <Link href="/learn" className="p-2 -ml-2" style={{ color: 'var(--text-muted)' }}>
               <ArrowLeft size={20} />
@@ -125,7 +125,7 @@ export default function CzechPage() {
 
     return (
       <div className="flex flex-col h-dvh">
-        <div className="flex-1 flex flex-col items-center justify-center p-6 pb-24">
+        <div className="flex-1 flex flex-col items-center justify-center p-6 pb-nav">
           <motion.div
             initial={{ scale: 0 }}
             animate={{ scale: 1 }}
@@ -177,7 +177,7 @@ export default function CzechPage() {
 
   return (
     <div className="flex flex-col h-dvh">
-      <div className="flex-1 flex flex-col p-4 pb-24 safe-top">
+      <div className="flex-1 flex flex-col p-4 pb-nav safe-top">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <button onClick={() => setScreen('menu')} style={{ color: 'var(--text-muted)' }}>
