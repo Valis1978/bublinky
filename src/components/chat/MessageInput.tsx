@@ -134,8 +134,7 @@ export function MessageInput({ onSend, onPhoto, onVideo, onVoice, disabled }: Me
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*"
-        capture="environment"
+        accept="image/*,video/*"
         onChange={handleFileChange}
         className="hidden"
       />
@@ -153,7 +152,6 @@ export function MessageInput({ onSend, onPhoto, onVideo, onVoice, disabled }: Me
         ref={videoInputRef}
         type="file"
         accept="video/*"
-        capture="environment"
         onChange={handleVideoChange}
         className="hidden"
       />
