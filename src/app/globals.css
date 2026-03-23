@@ -1,0 +1,158 @@
+@import "tailwindcss";
+
+/* ============================================================
+   Bublinky Theme System
+   - Viki: pre-teen aesthetic (rose, lavender, mint, soft coral)
+   - Táta: dark professional (slate, blue accent)
+   ============================================================ */
+
+@layer base {
+  [data-theme="viki"] {
+    --bg-primary: #FFF5F7;
+    --bg-secondary: #FFF0F5;
+    --bg-card: #FFFFFF;
+    --bg-card-hover: #FFF0F5;
+    --bg-input: #FFF0F5;
+    --bg-nav: rgba(255, 245, 247, 0.85);
+
+    --text-primary: #1F1F1F;
+    --text-secondary: #6B7280;
+    --text-muted: #9CA3AF;
+
+    --accent: #F9A8D4;
+    --accent-hover: #F472B6;
+    --accent-soft: rgba(249, 168, 212, 0.15);
+    --accent-gradient: linear-gradient(135deg, #F9A8D4, #FDBA74);
+
+    --lavender: #C4B5FD;
+    --mint: #86EFAC;
+    --coral: #FDA4AF;
+    --rose: #F9A8D4;
+
+    --bubble-sent: linear-gradient(135deg, #F9A8D4, #C4B5FD);
+    --bubble-sent-text: #FFFFFF;
+    --bubble-received: #FFFFFF;
+    --bubble-received-text: #1F1F1F;
+
+    --border: rgba(0, 0, 0, 0.06);
+    --shadow: 0 2px 12px rgba(249, 168, 212, 0.12);
+    --shadow-lg: 0 8px 32px rgba(249, 168, 212, 0.2);
+
+    --radius: 1.25rem;
+    --radius-sm: 0.75rem;
+    --radius-full: 9999px;
+  }
+
+  [data-theme="tata"] {
+    --bg-primary: #0F172A;
+    --bg-secondary: #1E293B;
+    --bg-card: #1E293B;
+    --bg-card-hover: #334155;
+    --bg-input: #334155;
+    --bg-nav: rgba(15, 23, 42, 0.9);
+
+    --text-primary: #F8FAFC;
+    --text-secondary: #94A3B8;
+    --text-muted: #64748B;
+
+    --accent: #3B82F6;
+    --accent-hover: #2563EB;
+    --accent-soft: rgba(59, 130, 246, 0.15);
+    --accent-gradient: linear-gradient(135deg, #3B82F6, #10B981);
+
+    --lavender: #818CF8;
+    --mint: #34D399;
+    --coral: #F87171;
+    --rose: #FB7185;
+
+    --bubble-sent: linear-gradient(135deg, #3B82F6, #2563EB);
+    --bubble-sent-text: #FFFFFF;
+    --bubble-received: #334155;
+    --bubble-received-text: #F8FAFC;
+
+    --border: rgba(255, 255, 255, 0.08);
+    --shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.5);
+
+    --radius: 1rem;
+    --radius-sm: 0.5rem;
+    --radius-full: 9999px;
+  }
+
+  * {
+    box-sizing: border-box;
+    margin: 0;
+    padding: 0;
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  body {
+    background: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-nunito), system-ui, sans-serif;
+    width: 100%;
+    overflow-x: hidden;
+    overscroll-behavior-y: none;
+    -webkit-overflow-scrolling: touch;
+    min-height: 100dvh;
+  }
+
+  [data-theme="tata"] body {
+    font-family: var(--font-inter), system-ui, sans-serif;
+  }
+}
+
+@layer components {
+  .glass-card {
+    background: var(--bg-card);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    backdrop-filter: blur(12px);
+  }
+
+  .accent-button {
+    background: var(--accent-gradient);
+    color: white;
+    border: none;
+    border-radius: var(--radius-full);
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    box-shadow: var(--shadow);
+  }
+
+  .accent-button:hover {
+    transform: translateY(-1px);
+    box-shadow: var(--shadow-lg);
+  }
+
+  .accent-button:active {
+    transform: translateY(0);
+  }
+
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .safe-top {
+    padding-top: max(0.5rem, env(safe-area-inset-top));
+  }
+}
+
+::-webkit-scrollbar {
+  width: 4px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--accent-soft);
+  border-radius: 999px;
+}
