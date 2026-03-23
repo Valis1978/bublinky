@@ -6,27 +6,28 @@ workflows:
     integrations:
       app_store_connect: Bublinky
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: cz.bublinky.app
       vars:
+        BUNDLE_ID: "cz.bublinky.app"
         XCODE_SCHEME: "App"
       node: 22
       xcode: latest
     scripts:
       - name: Install dependencies
-        script: |
-          npm ci
-      - name: Build web and sync to iOS
-        script: |
-          npx cap sync ios
+        script: npm ci
+      - name: Sync Capacitor iOS
+        script: npx cap sync ios
       - name: Set up code signing
         script: |
-          xcode-project use-profiles
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
+          xcode-project use-profiles --project ios/App/App.xcodeproj
       - name: Build IPA
         script: |
           xcode-project build-ipa \
-            --project "ios/App/App.xcodeproj" \
+            --project ios/App/App.xcodeproj \
             --scheme "$XCODE_SCHEME" \
             --archive-flags="-destination 'generic/platform=iOS'"
     artifacts:
