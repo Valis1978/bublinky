@@ -122,7 +122,7 @@ export function MessageInput({ onSend, onPhoto, onVideo, onVoice, disabled }: Me
         borderTop: '1px solid var(--border)',
       }}
     >
-      {/* Photo button */}
+      {/* Photo/Gallery button — opens iOS photo picker (gallery + camera) */}
       <button
         type="button"
         onClick={() => fileInputRef.current?.click()}
@@ -134,12 +134,12 @@ export function MessageInput({ onSend, onPhoto, onVideo, onVoice, disabled }: Me
       <input
         ref={fileInputRef}
         type="file"
-        accept="image/*,video/*"
+        accept="image/jpeg,image/png,image/heic,image/webp,video/mp4,video/quicktime"
         onChange={handleFileChange}
         className="hidden"
       />
 
-      {/* Video button */}
+      {/* Camera button — opens camera directly */}
       <button
         type="button"
         onClick={() => videoInputRef.current?.click()}
@@ -152,6 +152,7 @@ export function MessageInput({ onSend, onPhoto, onVideo, onVoice, disabled }: Me
         ref={videoInputRef}
         type="file"
         accept="video/*"
+        capture="environment"
         onChange={handleVideoChange}
         className="hidden"
       />
