@@ -44,6 +44,13 @@ export function MessageBubble({ message, isMine }: MessageBubbleProps) {
           />
         )}
 
+        {/* Voice */}
+        {message.type === 'voice' && message.media_url && (
+          <div className="flex items-center gap-2 mb-1">
+            <audio src={message.media_url} controls className="h-8 max-w-[200px]" preload="metadata" />
+          </div>
+        )}
+
         {/* Text content */}
         {message.content && (
           <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words">

@@ -18,10 +18,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
+    // Validate file type (images + audio)
+    const isImage = file.type.startsWith('image/');
+    const isAudio = file.type.startsWith('audio/');
+    if (!isImage && !isAudio) {
       return NextResponse.json(
-        { success: false, error: 'Only images allowed' },
+        { success: false, error: 'Only images and audio allowed' },
         { status: 400 }
       );
     }
@@ -34,9 +36,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const ext = file.name.split('.').pop() || 'jpg';
+    const ext = file.name.split('.').pop() || (isAudio ? 'mp4' : 'jpg');
     const filename = `${crypto.randomUUID()}.${ext}`;
-    const path = `photos/${filename}`;
+    const folder = isAudio ? 'voice' : 'photos';
+    const path = `${folder}/${filename}`;
 
     const supabase = createAdminClient();
     const bytes = await file.arrayBuffer();

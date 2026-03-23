@@ -49,6 +49,23 @@ export function ChatView() {
     }
   };
 
+  const handleVoice = async (blob: Blob) => {
+    const ext = blob.type.includes('mp4') ? 'mp4' : 'webm';
+    const file = new File([blob], `voice.${ext}`, { type: blob.type });
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const data = await res.json();
+    if (data.success && data.data?.url) {
+      sendMessage(null as unknown as string, 'voice', data.data.url);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -136,7 +153,7 @@ export function ChatView() {
 
       {/* Input area */}
       <div className="fixed bottom-16 left-0 right-0 z-40">
-        <MessageInput onSend={handleSend} onPhoto={handlePhoto} />
+        <MessageInput onSend={handleSend} onPhoto={handlePhoto} onVoice={handleVoice} />
       </div>
     </div>
   );
