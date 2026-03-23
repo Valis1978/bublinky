@@ -53,6 +53,14 @@ const games = [
     color: '#4ADE80',
     bg: 'linear-gradient(135deg, #F0FDF4, #DCFCE7)',
   },
+  {
+    id: 'emoji-quiz',
+    name: 'Emoji kvíz',
+    emoji: '🤔',
+    description: 'Uhádni z emoji!',
+    color: '#E879F9',
+    bg: 'linear-gradient(135deg, #FAF5FF, #F3E8FF)',
+  },
 ];
 
 export default function GamesPage() {
