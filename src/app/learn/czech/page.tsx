@@ -6,10 +6,12 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Check, X, Lightbulb, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { getExercises, FAMILIES, type IYExercise } from '@/lib/questions/czech';
+import { useStats } from '@/hooks/useStats';
 
 type Screen = 'menu' | 'quiz' | 'result';
 
 export default function CzechPage() {
+  const { completeSession } = useStats();
   const [screen, setScreen] = useState<Screen>('menu');
   const [selectedFamily, setSelectedFamily] = useState<string | null>(null);
   const [exercises, setExercises] = useState<IYExercise[]>([]);
@@ -49,6 +51,8 @@ export default function CzechPage() {
     setShowExplanation(false);
     setLastAnswer(null);
     if (currentIdx + 1 >= exercises.length) {
+      const correct = answers.filter((a) => a.correct).length + (lastAnswer === 'correct' ? 1 : 0);
+      completeSession(correct, exercises.length);
       setScreen('result');
     } else {
       setCurrentIdx((prev) => prev + 1);

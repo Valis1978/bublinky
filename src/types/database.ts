@@ -1,7 +1,7 @@
 // Bublinky Database Types
 
 export type UserRole = 'parent' | 'child';
-export type MessageType = 'text' | 'photo' | 'voice';
+export type MessageType = 'text' | 'photo' | 'voice' | 'video';
 export type TaskCategory = 'school' | 'home' | 'fun' | 'event';
 export type TaskType = 'one_time' | 'recurring' | 'event';
 

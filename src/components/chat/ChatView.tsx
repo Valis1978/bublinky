@@ -66,6 +66,21 @@ export function ChatView() {
     }
   };
 
+  const handleVideo = async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const res = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    const data = await res.json();
+    if (data.success && data.data?.url) {
+      sendMessage(null as unknown as string, 'video' as 'text', data.data.url);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
@@ -153,7 +168,7 @@ export function ChatView() {
 
       {/* Input area */}
       <div className="fixed bottom-16 left-0 right-0 z-40">
-        <MessageInput onSend={handleSend} onPhoto={handlePhoto} onVoice={handleVoice} />
+        <MessageInput onSend={handleSend} onPhoto={handlePhoto} onVideo={handleVideo} onVoice={handleVoice} />
       </div>
     </div>
   );

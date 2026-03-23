@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, RotateCcw, Bot, Users } from 'lucide-react';
 import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
+import { useStats } from '@/hooks/useStats';
 import { createClient } from '@/lib/supabase/client';
 
 type Cell = 'X' | 'O' | null;
@@ -39,6 +40,7 @@ function getAIMove(board: Board): number {
 
 export default function TicTacToePage() {
   const { user } = useAuth();
+  const { winGame } = useStats();
   const [mode, setMode] = useState<GameMode>('menu');
   const [board, setBoard] = useState<Board>(Array(9).fill(null));
   const [isPlayerTurn, setIsPlayerTurn] = useState(true);
@@ -109,7 +111,7 @@ export default function TicTacToePage() {
 
         if (result.winner || newBoard.every((c) => c !== null)) {
           setBoard(newBoard);
-          if (result.winner === 'X') setScores((s) => ({ ...s, player: s.player + 1 }));
+          if (result.winner === 'X') { winGame(); setScores((s) => ({ ...s, player: s.player + 1 })); }
           else if (!result.winner) setScores((s) => ({ ...s, draws: s.draws + 1 }));
           return;
         }
@@ -142,12 +144,12 @@ export default function TicTacToePage() {
         });
 
         const result = checkWinner(newBoard);
-        if (result.winner === mySymbol) setScores((s) => ({ ...s, player: s.player + 1 }));
+        if (result.winner === mySymbol) { winGame(); setScores((s) => ({ ...s, player: s.player + 1 })); }
         else if (result.winner) setScores((s) => ({ ...s, opponent: s.opponent + 1 }));
         else if (newBoard.every((c) => c !== null)) setScores((s) => ({ ...s, draws: s.draws + 1 }));
       }
     },
-    [board, isPlayerTurn, gameOver, mode, mySymbol]
+    [board, isPlayerTurn, gameOver, mode, mySymbol, winGame]
   );
 
   const reset = () => {

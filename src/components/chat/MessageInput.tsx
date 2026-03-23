@@ -2,12 +2,13 @@
 
 import { useState, useRef, type FormEvent } from 'react';
 import { motion } from 'framer-motion';
-import { Send, Image as ImageIcon, Mic, Square } from 'lucide-react';
+import { Send, Image as ImageIcon, Video, Mic } from 'lucide-react';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 
 interface MessageInputProps {
   onSend: (content: string) => void;
   onPhoto?: (file: File) => void;
+  onVideo?: (file: File) => void;
   onVoice?: (blob: Blob) => void;
   disabled?: boolean;
 }
@@ -18,9 +19,10 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export function MessageInput({ onSend, onPhoto, onVoice, disabled }: MessageInputProps) {
+export function MessageInput({ onSend, onPhoto, onVideo, onVoice, disabled }: MessageInputProps) {
   const [text, setText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
   const { isRecording, duration, startRecording, stopRecording, cancelRecording } = useVoiceRecorder();
 
   const handleSubmit = (e: FormEvent) => {
@@ -38,6 +40,16 @@ export function MessageInput({ onSend, onPhoto, onVoice, disabled }: MessageInpu
     }
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+  };
+
+  const handleVideoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file && onVideo) {
+      onVideo(file);
+    }
+    if (videoInputRef.current) {
+      videoInputRef.current.value = '';
     }
   };
 
@@ -125,6 +137,24 @@ export function MessageInput({ onSend, onPhoto, onVoice, disabled }: MessageInpu
         accept="image/*"
         capture="environment"
         onChange={handleFileChange}
+        className="hidden"
+      />
+
+      {/* Video button */}
+      <button
+        type="button"
+        onClick={() => videoInputRef.current?.click()}
+        className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors"
+        style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+      >
+        <Video size={20} />
+      </button>
+      <input
+        ref={videoInputRef}
+        type="file"
+        accept="video/*"
+        capture="environment"
+        onChange={handleVideoChange}
         className="hidden"
       />
 

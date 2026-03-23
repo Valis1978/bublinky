@@ -5,16 +5,23 @@ import { TaskCard } from '@/components/tasks/TaskCard';
 import { TaskForm } from '@/components/tasks/TaskForm';
 import { useTasks } from '@/hooks/useTasks';
 import { useAuth } from '@/hooks/useAuth';
+import { useStats } from '@/hooks/useStats';
 import { motion, AnimatePresence } from 'framer-motion';
 import { CheckCircle2, ListTodo } from 'lucide-react';
 import { useState } from 'react';
 
 export default function TasksPage() {
   const { user } = useAuth();
+  const { completeTask: trackTaskXP } = useStats();
   const { pendingTasks, completedTasks, loading, createTask, toggleComplete, deleteTask } =
     useTasks();
   const [showCompleted, setShowCompleted] = useState(false);
   const isParent = user?.role === 'parent';
+
+  const handleToggle = (taskId: string, isCompleted: boolean) => {
+    toggleComplete(taskId, isCompleted);
+    if (!isCompleted) trackTaskXP(); // Award XP when completing
+  };
 
   return (
     <div className="flex flex-col h-dvh">
@@ -73,7 +80,7 @@ export default function TasksPage() {
                 <TaskCard
                   key={task.id}
                   task={task}
-                  onToggle={toggleComplete}
+                  onToggle={handleToggle}
                   onDelete={isParent ? deleteTask : undefined}
                   isParent={isParent}
                 />
@@ -93,7 +100,7 @@ export default function TasksPage() {
                 <TaskCard
                   key={task.id}
                   task={task}
-                  onToggle={toggleComplete}
+                  onToggle={handleToggle}
                   onDelete={isParent ? deleteTask : undefined}
                   isParent={isParent}
                 />

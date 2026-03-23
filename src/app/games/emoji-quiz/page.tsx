@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useStats } from '@/hooks/useStats';
 import { BottomNav } from '@/components/ui/BottomNav';
 import { motion } from 'framer-motion';
 import { ArrowLeft, RotateCcw, ChevronRight } from 'lucide-react';
@@ -51,6 +52,7 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 export default function EmojiQuizPage() {
+  const { winGame } = useStats();
   const [questions] = useState(() => shuffle(QUIZZES).slice(0, 10));
   const [currentIdx, setCurrentIdx] = useState(0);
   const [score, setScore] = useState(0);
@@ -70,6 +72,9 @@ export default function EmojiQuizPage() {
       }
       setTimeout(() => {
         if (currentIdx + 1 >= questions.length) {
+          const finalScore = answer === current.answer ? score + 1 : score;
+          const pct = Math.round((finalScore / questions.length) * 100);
+          if (pct >= 80) winGame();
           setShowResult(true);
         } else {
           setCurrentIdx((i) => i + 1);
@@ -77,7 +82,7 @@ export default function EmojiQuizPage() {
         }
       }, 1200);
     },
-    [selected, current, currentIdx, questions.length]
+    [selected, current, currentIdx, questions.length, score, winGame]
   );
 
   const restart = () => {

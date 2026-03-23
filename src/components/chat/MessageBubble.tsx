@@ -51,6 +51,18 @@ export function MessageBubble({ message, isMine }: MessageBubbleProps) {
           </div>
         )}
 
+        {/* Video */}
+        {message.type === 'video' && message.media_url && (
+          <video
+            src={message.media_url}
+            controls
+            playsInline
+            preload="metadata"
+            className="rounded-xl mb-1.5 max-w-full"
+            style={{ maxHeight: 300 }}
+          />
+        )}
+
         {/* Text content */}
         {message.content && (
           <p className="text-[15px] leading-relaxed whitespace-pre-wrap break-words">

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+import { useStats } from '@/hooks/useStats';
 import { BottomNav } from '@/components/ui/BottomNav';
 import { motion } from 'framer-motion';
 import { ArrowLeft, RotateCcw, Flag, Bomb } from 'lucide-react';
@@ -85,6 +86,7 @@ function revealEmpty(board: CellState[][], r: number, c: number): CellState[][] 
 const numberColors = ['', '#3B82F6', '#22C55E', '#EF4444', '#7C3AED', '#DC2626', '#0EA5E9', '#1F2937', '#6B7280'];
 
 export default function MinesweeperPage() {
+  const { winGame } = useStats();
   const [board, setBoard] = useState(() => createBoard());
   const [gameOver, setGameOver] = useState(false);
   const [isWon, setIsWon] = useState(false);
@@ -100,9 +102,10 @@ export default function MinesweeperPage() {
       if (revealedCount === nonMines) {
         setIsWon(true);
         setGameOver(true);
+        winGame();
       }
     },
-    []
+    [winGame]
   );
 
   const handleClick = (r: number, c: number) => {

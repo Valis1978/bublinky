@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useStats } from '@/hooks/useStats';
 import { BottomNav } from '@/components/ui/BottomNav';
 import { motion } from 'framer-motion';
 import { ArrowLeft, RotateCcw } from 'lucide-react';
@@ -96,6 +97,7 @@ const tileColors: Record<number, { bg: string; text: string }> = {
 };
 
 export default function Puzzle2048Page() {
+  const { winGame } = useStats();
   const [grid, setGrid] = useState<Grid>(() => addRandomTile(addRandomTile(createEmptyGrid())));
   const [score, setScore] = useState(0);
   const [best, setBest] = useState(0);
@@ -126,13 +128,14 @@ export default function Puzzle2048Page() {
       // Check 2048
       if (newGrid.flat().includes(2048) && !won) {
         setWon(true);
+        winGame();
       }
 
       if (!canMove(newGrid)) {
         setGameOver(true);
       }
     },
-    [grid, score, best, gameOver, won]
+    [grid, score, best, gameOver, won, winGame]
   );
 
   // Keyboard + Swipe

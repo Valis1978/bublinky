@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useStats } from '@/hooks/useStats';
 import { BottomNav } from '@/components/ui/BottomNav';
 import { motion } from 'framer-motion';
 import { ArrowLeft, RotateCcw, ArrowUp, ArrowDown, ArrowRight, ChevronLeft } from 'lucide-react';
@@ -25,6 +26,7 @@ function randomFood(snake: Point[]): Point {
 }
 
 export default function SnakePage() {
+  const { winGame } = useStats();
   const [snake, setSnake] = useState<Point[]>([{ x: 7, y: 7 }]);
   const [food, setFood] = useState<Point>({ x: 3, y: 3 });
   const [direction, setDirection] = useState<Direction>('RIGHT');
@@ -89,6 +91,7 @@ export default function SnakePage() {
           setGameOver(true);
           setIsPlaying(false);
           if (score > bestScore) {
+            winGame();
             setBestScore(score);
             localStorage.setItem('bub_snake_best', String(score));
           }
@@ -100,6 +103,7 @@ export default function SnakePage() {
           setGameOver(true);
           setIsPlaying(false);
           if (score > bestScore) {
+            winGame();
             setBestScore(score);
             localStorage.setItem('bub_snake_best', String(score));
           }

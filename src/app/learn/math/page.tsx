@@ -6,6 +6,7 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, ChevronRight, Check, X, Trophy } from 'lucide-react';
 import Link from 'next/link';
 import { generateProblem, type MathProblem, type MathOperation, type MathDifficulty } from '@/lib/questions/math-generator';
+import { useStats } from '@/hooks/useStats';
 
 type Screen = 'menu' | 'quiz' | 'result';
 
@@ -25,6 +26,7 @@ const difficulties: Array<{ level: MathDifficulty; label: string; desc: string }
 ];
 
 export default function MathPage() {
+  const { completeSession } = useStats();
   const [screen, setScreen] = useState<Screen>('menu');
   const [selectedOp, setSelectedOp] = useState<string>('mix');
   const [difficulty, setDifficulty] = useState<MathDifficulty>(1);
@@ -63,6 +65,8 @@ export default function MathPage() {
       // Auto-advance after delay
       setTimeout(() => {
         if (questionNum + 1 >= totalQuestions) {
+          const finalScore = score + (correct ? 1 : 0);
+          completeSession(finalScore, totalQuestions);
           setScreen('result');
         } else {
           setQuestionNum((n) => n + 1);

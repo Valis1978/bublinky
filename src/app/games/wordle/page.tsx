@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
+import { useStats } from '@/hooks/useStats';
 import { BottomNav } from '@/components/ui/BottomNav';
 import { motion } from 'framer-motion';
 import { ArrowLeft, RotateCcw, Delete } from 'lucide-react';
@@ -60,6 +61,7 @@ const stateColors: Record<LetterState, string> = {
 };
 
 export default function WordlePage() {
+  const { winGame } = useStats();
   const [answer] = useState(() => WORDS[Math.floor(Math.random() * WORDS.length)]);
   const [guesses, setGuesses] = useState<string[]>([]);
   const [current, setCurrent] = useState('');
@@ -91,6 +93,7 @@ export default function WordlePage() {
         setCurrent('');
 
         if (current === answer) {
+          winGame();
           setWon(true);
           setGameOver(true);
         } else if (newGuesses.length >= MAX_GUESSES) {
@@ -108,7 +111,7 @@ export default function WordlePage() {
         setCurrent((prev) => prev + key);
       }
     },
-    [current, guesses, answer, gameOver]
+    [current, guesses, answer, gameOver, winGame]
   );
 
   // Physical keyboard

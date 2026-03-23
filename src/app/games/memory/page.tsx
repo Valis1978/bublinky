@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useStats } from '@/hooks/useStats';
 import { BottomNav } from '@/components/ui/BottomNav';
 import { motion } from 'framer-motion';
 import { ArrowLeft, RotateCcw, Trophy } from 'lucide-react';
@@ -42,6 +43,7 @@ function createBoard(size: number = 8): Card[] {
 }
 
 export default function MemoryPage() {
+  const { winGame } = useStats();
   const [cards, setCards] = useState<Card[]>(() => createBoard());
   const [flipped, setFlipped] = useState<number[]>([]);
   const [moves, setMoves] = useState(0);
@@ -84,6 +86,7 @@ export default function MemoryPage() {
             setMatches((m) => {
               const newMatches = m + 1;
               if (newMatches === totalPairs) {
+                winGame();
                 const finalMoves = moves + 1;
                 if (!bestScore || finalMoves < bestScore) {
                   setBestScore(finalMoves);
@@ -109,7 +112,7 @@ export default function MemoryPage() {
         }
       }
     },
-    [cards, flipped, isLocked, moves, matches, totalPairs, bestScore]
+    [cards, flipped, isLocked, moves, matches, totalPairs, bestScore, winGame]
   );
 
   const reset = () => {
