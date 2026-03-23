@@ -9,9 +9,10 @@ workflows:
       vars:
         BUNDLE_ID: "cz.bublinky.app"
         XCODE_SCHEME: "App"
+        APP_STORE_CONNECT_ISSUER_ID: "ca0ef91e-65b4-4adc-a452-d5c1b590e884"
+        APP_STORE_CONNECT_KEY_IDENTIFIER: "SPU39S48DJ"
       node: 22
       xcode: latest
-      cocoapods: default
     scripts:
       - name: Install dependencies
         script: |
@@ -19,7 +20,7 @@ workflows:
       - name: Update Capacitor iOS project
         script: |
           npx cap sync ios
-      - name: Set up keychain and signing
+      - name: Set up code signing
         script: |
           keychain initialize
           app-store-connect fetch-signing-files "$BUNDLE_ID" \
@@ -29,13 +30,45 @@ workflows:
           xcode-project use-profiles
       - name: Build iOS app
         script: |
-          xcode-project build-ipa \
-            --project "ios/App/App.xcodeproj" \
-            --scheme "$XCODE_SCHEME" \
-            --archive-flags="CODE_SIGN_STYLE=Manual"
+          xcodebuild -project ios/App/App.xcodeproj \
+            -scheme "$XCODE_SCHEME" \
+            -configuration Release \
+            -sdk iphoneos \
+            -archivePath build/ios/App.xcarchive \
+            archive \
+            CODE_SIGN_STYLE=Automatic \
+            DEVELOPMENT_TEAM=578588C5PF \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$APP_STORE_CONNECT_PRIVATE_KEY" \
+            -authenticationKeyID "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID"
+      - name: Export IPA
+        script: |
+          cat > exportOptions.plist << EOF2
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>method</key>
+            <string>app-store</string>
+            <key>teamID</key>
+            <string>578588C5PF</string>
+            <key>signingStyle</key>
+            <string>automatic</string>
+          </dict>
+          </plist>
+          EOF2
+          xcodebuild -exportArchive \
+            -archivePath build/ios/App.xcarchive \
+            -exportOptionsPlist exportOptions.plist \
+            -exportPath build/ios/ipa \
+            -allowProvisioningUpdates \
+            -authenticationKeyPath "$APP_STORE_CONNECT_PRIVATE_KEY" \
+            -authenticationKeyID "$APP_STORE_CONNECT_KEY_IDENTIFIER" \
+            -authenticationKeyIssuerID "$APP_STORE_CONNECT_ISSUER_ID"
     artifacts:
       - build/ios/ipa/*.ipa
-      - /tmp/xcodebuild_logs/*.log
+      - build/ios/App.xcarchive
     publishing:
       app_store_connect:
         auth: integration
