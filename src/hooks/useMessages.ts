@@ -28,7 +28,13 @@ export function useMessages(userId: string | undefined) {
         body: JSON.stringify({ content, type, media_url: mediaUrl }),
       });
       const data = await res.json();
-      // Message will arrive via Realtime subscription
+      // Optimistically add sent message + refetch for sync
+      if (data.success && data.data) {
+        setMessages((prev) => {
+          if (prev.some((m) => m.id === data.data.id)) return prev;
+          return [...prev, data.data];
+        });
+      }
       return data;
     },
     []
