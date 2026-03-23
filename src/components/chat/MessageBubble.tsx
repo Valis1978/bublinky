@@ -1,7 +1,8 @@
 'use client';
 
-import { motion } from 'framer-motion';
-import { Check, CheckCheck } from 'lucide-react';
+import { useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Check, CheckCheck, X, Download } from 'lucide-react';
 import type { BubMessage } from '@/types/database';
 
 interface MessageBubbleProps {
@@ -15,7 +16,63 @@ function formatTime(dateStr: string): string {
 }
 
 export function MessageBubble({ message, isMine }: MessageBubbleProps) {
+  const [fullscreen, setFullscreen] = useState(false);
+  const mediaUrl = message.media_url;
+
   return (
+    <>
+      {/* Fullscreen image/video overlay */}
+      <AnimatePresence>
+        {fullscreen && mediaUrl && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center"
+            onClick={() => setFullscreen(false)}
+          >
+            {/* Close button */}
+            <button
+              className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white z-10"
+              onClick={() => setFullscreen(false)}
+            >
+              <X size={24} />
+            </button>
+
+            {/* Download button */}
+            <a
+              href={mediaUrl}
+              download
+              target="_blank"
+              rel="noopener noreferrer"
+              className="absolute top-4 left-4 p-2 rounded-full bg-white/10 text-white z-10"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <Download size={24} />
+            </a>
+
+            {message.type === 'video' ? (
+              <video
+                src={mediaUrl}
+                controls
+                autoPlay
+                playsInline
+                className="max-w-full max-h-full object-contain"
+                onClick={(e) => e.stopPropagation()}
+              />
+            ) : (
+              <motion.img
+                initial={{ scale: 0.8 }}
+                animate={{ scale: 1 }}
+                src={mediaUrl}
+                alt=""
+                className="max-w-full max-h-full object-contain"
+              />
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
     <motion.div
       initial={{ opacity: 0, y: 12, scale: 0.95 }}
       animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -33,14 +90,15 @@ export function MessageBubble({ message, isMine }: MessageBubbleProps) {
           boxShadow: isMine ? 'none' : 'var(--shadow)',
         }}
       >
-        {/* Photo */}
+        {/* Photo — tap to fullscreen */}
         {message.type === 'photo' && message.media_url && (
           <img
             src={message.media_url}
             alt=""
-            className="rounded-xl mb-1.5 max-w-full"
+            className="rounded-xl mb-1.5 max-w-full cursor-pointer active:opacity-80 transition-opacity"
             style={{ maxHeight: 300 }}
             loading="lazy"
+            onClick={() => setFullscreen(true)}
           />
         )}
 
@@ -51,16 +109,22 @@ export function MessageBubble({ message, isMine }: MessageBubbleProps) {
           </div>
         )}
 
-        {/* Video */}
+        {/* Video — tap to fullscreen */}
         {message.type === 'video' && message.media_url && (
-          <video
-            src={message.media_url}
-            controls
-            playsInline
-            preload="metadata"
-            className="rounded-xl mb-1.5 max-w-full"
-            style={{ maxHeight: 300 }}
-          />
+          <div className="relative cursor-pointer" onClick={() => setFullscreen(true)}>
+            <video
+              src={message.media_url}
+              playsInline
+              preload="metadata"
+              className="rounded-xl mb-1.5 max-w-full"
+              style={{ maxHeight: 300 }}
+            />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="w-12 h-12 rounded-full bg-black/50 flex items-center justify-center">
+                <span className="text-white text-xl ml-1">▶</span>
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Text content */}
@@ -92,5 +156,6 @@ export function MessageBubble({ message, isMine }: MessageBubbleProps) {
         </div>
       </div>
     </motion.div>
+    </>
   );
 }
