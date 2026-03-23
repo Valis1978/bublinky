@@ -2,12 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { MessageCircle, ListTodo, GraduationCap, User } from 'lucide-react';
+import { MessageCircle, ListTodo, Gamepad2, GraduationCap, User } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 const navItems = [
   { href: '/chat', label: 'Chat', icon: MessageCircle },
   { href: '/tasks', label: 'Úkoly', icon: ListTodo },
+  { href: '/games', label: 'Hry', icon: Gamepad2 },
   { href: '/learn', label: 'Učení', icon: GraduationCap },
   { href: '/profile', label: 'Profil', icon: User },
 ];
