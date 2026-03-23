@@ -36,9 +36,6 @@ workflows:
       - /tmp/xcodebuild_logs/*.log
     publishing:
       app_store_connect:
-        # API Key auth — set these in Codemagic Environment variables:
-        # APP_STORE_CONNECT_ISSUER_ID, APP_STORE_CONNECT_KEY_IDENTIFIER,
-        # APP_STORE_CONNECT_PRIVATE_KEY
-        auth: api_key
+        auth: integration
         submit_to_testflight: true
         expire_build_submitted_for_review: true
