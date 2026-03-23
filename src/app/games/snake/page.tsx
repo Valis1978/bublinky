@@ -7,8 +7,8 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, RotateCcw, ArrowUp, ArrowDown, ArrowRight, ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
 
-const GRID = 15;
-const CELL_SIZE = 22;
+const GRID = 12;
+const CELL_SIZE = 26;
 const INITIAL_SPEED = 150;
 
 type Point = { x: number; y: number };
@@ -27,7 +27,7 @@ function randomFood(snake: Point[]): Point {
 
 export default function SnakePage() {
   const { winGame } = useStats();
-  const [snake, setSnake] = useState<Point[]>([{ x: 7, y: 7 }]);
+  const [snake, setSnake] = useState<Point[]>([{ x: 6, y: 6 }]);
   const [food, setFood] = useState<Point>({ x: 3, y: 3 });
   const [direction, setDirection] = useState<Direction>('RIGHT');
   const [gameOver, setGameOver] = useState(false);
@@ -128,8 +128,8 @@ export default function SnakePage() {
   }, [isPlaying, gameOver, food, score, bestScore]);
 
   const start = () => {
-    setSnake([{ x: 7, y: 7 }]);
-    setFood(randomFood([{ x: 7, y: 7 }]));
+    setSnake([{ x: 6, y: 6 }]);
+    setFood(randomFood([{ x: 6, y: 6 }]));
     setDirection('RIGHT');
     setScore(0);
     setGameOver(false);

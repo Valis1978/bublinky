@@ -7,9 +7,9 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, RotateCcw, Flag, Bomb } from 'lucide-react';
 import Link from 'next/link';
 
-const ROWS = 9;
-const COLS = 9;
-const MINES = 10;
+const ROWS = 12;
+const COLS = 10;
+const MINES = 20;
 
 type CellState = {
   isMine: boolean;

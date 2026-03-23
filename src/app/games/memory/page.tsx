@@ -8,9 +8,10 @@ import { ArrowLeft, RotateCcw, Trophy } from 'lucide-react';
 import Link from 'next/link';
 
 const EMOJI_SETS = [
-  ['🐶', '🐱', '🐰', '🦊', '🐻', '🐼', '🐨', '🦁'],
-  ['🍎', '🍊', '🍋', '🍇', '🍓', '🍑', '🍒', '🥝'],
-  ['⭐', '🌙', '☀️', '🌈', '❄️', '🔥', '💎', '🎀'],
+  ['🐶', '🐱', '🐰', '🦊', '🐻', '🐼', '🐨', '🦁', '🐸', '🦋', '🐧', '🦄'],
+  ['🍎', '🍊', '🍋', '🍇', '🍓', '🍑', '🍒', '🥝', '🍕', '🧁', '🍩', '🌮'],
+  ['⭐', '🌙', '☀️', '🌈', '❄️', '🔥', '💎', '🎀', '🌸', '🦩', '🎭', '🎪'],
+  ['🎸', '🎹', '🎺', '🎻', '🥁', '🎤', '🎧', '🎵', '🎶', '🎼', '🪗', '🎷'],
 ];
 
 interface Card {
@@ -29,7 +30,7 @@ function shuffleArray<T>(array: T[]): T[] {
   return shuffled;
 }
 
-function createBoard(size: number = 8): Card[] {
+function createBoard(size: number = 10): Card[] {
   const setIndex = Math.floor(Math.random() * EMOJI_SETS.length);
   const emojis = EMOJI_SETS[setIndex].slice(0, size);
   const pairs = [...emojis, ...emojis];
@@ -158,7 +159,7 @@ export default function MemoryPage() {
         </div>
 
         {/* Board */}
-        <div className="grid grid-cols-4 gap-2 max-w-sm mx-auto">
+        <div className="grid grid-cols-5 gap-2 max-w-sm mx-auto">
           {cards.map((card) => (
             <motion.button
               key={card.id}
