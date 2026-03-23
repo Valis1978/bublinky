@@ -61,6 +61,14 @@ const games = [
     color: '#E879F9',
     bg: 'linear-gradient(135deg, #FAF5FF, #F3E8FF)',
   },
+  {
+    id: 'ai-quiz',
+    name: 'AI Kvíz',
+    emoji: '✨',
+    description: 'Kvíz o čemkoliv!',
+    color: '#8B5CF6',
+    bg: 'linear-gradient(135deg, #EDE9FE, #DDD6FE)',
+  },
 ];
 
 export default function GamesPage() {

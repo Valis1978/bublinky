@@ -6,34 +6,9 @@ import { BottomNav } from '@/components/ui/BottomNav';
 import { motion } from 'framer-motion';
 import { ArrowLeft, RotateCcw, Delete } from 'lucide-react';
 import Link from 'next/link';
+import { VALID_WORDS } from '@/data/wordle-words';
 
-// Czech 5-letter words (no diacritics for simplicity, displayed with them)
-const WORDS = [
-  // Zvířata
-  'KOCKA', 'KOZEL', 'OVCAK', 'JEZEK', 'LIСКА', 'RYBKA', 'BOBEK', 'KUZEL',
-  'VLCEK', 'KONIK', 'PTACE', 'BERAN', 'HOLUB', 'VRANA', 'BOCEK',
-  // Příroda
-  'STROM', 'KYTKA', 'LISTY', 'POTOK', 'OBLAK', 'SLUNЬ', 'LOUKA', 'KAMEN',
-  'BREZA', 'JALEC', 'RAKOS', 'TRAVA', 'VRCHY', 'KOPEC', 'MOREK',
-  // Jídlo
-  'MLEKO', 'CHLEB', 'MASLO', 'KOLAC', 'MRKEV', 'SALAT', 'PIZZA', 'POLEV',
-  'HRNEK', 'TALIR', 'VIDLA', 'ROHEL', 'BUCEK', 'KNEDL', 'SYREC',
-  // Domov
-  'DOMEK', 'KNIHA', 'LAMPA', 'OKIHO', 'STOLЬ', 'POSAD', 'DVERE', 'SKLEP',
-  'KOMIN', 'ZAHON', 'BUDKA', 'SCHOD', 'KLIKA', 'POKOL', 'PLOTY',
-  // Škola
-  'SKOLA', 'SESIT', 'KRIDA', 'TABUL', 'AKTOV', 'ZVONE', 'UCENI', 'SLOYO',
-  'PRACE', 'POCIT', 'ZNAKY', 'CISLA', 'BARVY', 'TVARY', 'RUKOL',
-  // Město
-  'MESTO', 'PLZEN', 'BRNEO', 'ULICE', 'NAMYR', 'VLAKY', 'MOSTY', 'LAMPY',
-  'BUDOV', 'PARKY', 'LAVIC', 'HODIS', 'KOSTЬ',
-  // Sport + zábava
-  'FOTBA', 'HOKEJ', 'BAZEN', 'LYZAR', 'TANEC', 'ZPEVA', 'DRAMA',
-  'SKOKY', 'KONCE', 'START', 'VITEZ', 'DRAHA', 'CESTA',
-  // Různé
-  'SRDCE', 'HVEZD', 'KONEC', 'BLAZE', 'RADOL', 'HUMOR', 'SMICH',
-  'ZLATO', 'MODRA', 'ZELIR', 'BILEC', 'SEDYN', 'KOUZL',
-];
+const WORDS = VALID_WORDS;
 
 const KEYBOARD_ROWS = [
   'QWERTZUIOP'.split(''),
