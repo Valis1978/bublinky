@@ -5,7 +5,8 @@ import { useAuth } from '@/hooks/useAuth';
 import { useStats } from '@/hooks/useStats';
 import { ACHIEVEMENTS } from '@/lib/gamification';
 import { motion, AnimatePresence } from 'framer-motion';
-import { LogOut, Flame, Trophy, Star, Target, Zap } from 'lucide-react';
+import { LogOut, Flame, Trophy, Star, Target, Zap, PawPrint, CloudSun, BookOpen, Sparkles } from 'lucide-react';
+import Link from 'next/link';
 
 export default function ProfilePage() {
   const { user, logout } = useAuth();
@@ -186,6 +187,37 @@ export default function ProfilePage() {
                 </div>
               );
             })}
+          </div>
+        </div>
+
+        {/* More sections */}
+        <div className="mb-6">
+          <p className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>
+            Více
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { href: '/pet', icon: PawPrint, label: 'Mazlíček', emoji: '🐾', color: '#F59E0B' },
+              { href: '/weather', icon: CloudSun, label: 'Počasí', emoji: '🌤️', color: '#0EA5E9' },
+              { href: '/stories', icon: Sparkles, label: 'Příběhy', emoji: '✨', color: '#A855F7' },
+              { href: '/diary', icon: BookOpen, label: 'Deníček', emoji: '📓', color: '#EC4899' },
+            ].map((item) => (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="glass-card p-4 flex items-center gap-3 transition-all active:scale-95"
+              >
+                <div
+                  className="w-10 h-10 rounded-xl flex items-center justify-center text-lg"
+                  style={{ background: `${item.color}20` }}
+                >
+                  {item.emoji}
+                </div>
+                <span className="font-medium text-sm" style={{ color: 'var(--text-primary)' }}>
+                  {item.label}
+                </span>
+              </Link>
+            ))}
           </div>
         </div>
 
