@@ -8,6 +8,7 @@ workflows:
     environment:
       groups:
         - bublinky-env
+        - ios-signing
       vars:
         XCODE_PROJECT: "ios/App/App.xcodeproj"
         XCODE_SCHEME: "App"
