@@ -6,9 +6,6 @@ workflows:
     integrations:
       app_store_connect: Bublinky
     environment:
-      ios_signing:
-        distribution_type: app_store
-        bundle_identifier: cz.bublinky.app
       vars:
         XCODE_PROJECT: "ios/App/App.xcodeproj"
         XCODE_SCHEME: "App"
@@ -26,7 +23,15 @@ workflows:
       - name: Sync Capacitor
         script: npx cap sync ios
 
-      - name: Set up code signing
+      - name: Set up keychain and fetch signing files
+        script: |
+          keychain initialize
+          app-store-connect fetch-signing-files "$BUNDLE_ID" \
+            --type IOS_APP_STORE \
+            --create
+          keychain add-certificates
+
+      - name: Apply signing profiles to Xcode project
         script: xcode-project use-profiles --project "$XCODE_PROJECT"
 
       - name: Build IPA
