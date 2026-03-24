@@ -39,18 +39,24 @@ workflows:
 
       - name: Increment build number and build IPA
         script: |
-          # Get latest build number from TestFlight
-          LATEST_BUILD=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" 2>/dev/null || echo 0)
-          # Ensure minimum of 3 (we already have builds 1-3)
-          if [ "$LATEST_BUILD" -lt 3 ]; then LATEST_BUILD=3; fi
-          NEW_BUILD=$(($LATEST_BUILD + 1))
-          echo "Latest: $LATEST_BUILD → New: $NEW_BUILD"
-          # Build IPA with --build-number override (most reliable method)
+          # Hardcoded floor — we already uploaded builds 1-3
+          NEW_BUILD=4
+          LATEST_BUILD=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" 2>/dev/null || true)
+          if [ -n "$LATEST_BUILD" ] && [ "$LATEST_BUILD" -ge 4 ] 2>/dev/null; then
+            NEW_BUILD=$(($LATEST_BUILD + 1))
+          fi
+          echo "Build number: $NEW_BUILD"
+          # Patch Info.plist
+          PLIST="$CM_BUILD_DIR/ios/App/App/Info.plist"
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $NEW_BUILD" "$PLIST"
+          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$PLIST"
+          # Patch pbxproj
+          sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*/CURRENT_PROJECT_VERSION = $NEW_BUILD/g" "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
+          # Build with xcargs override
           xcode-project build-ipa \
             --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME" \
-            --build-number "$NEW_BUILD" \
-            --archive-xcargs="DEVELOPMENT_TEAM=$TEAM_ID" \
+            --archive-xcargs="DEVELOPMENT_TEAM=$TEAM_ID CURRENT_PROJECT_VERSION=$NEW_BUILD" \
             --archive-flags="-destination 'generic/platform=iOS'"
 
     artifacts:
