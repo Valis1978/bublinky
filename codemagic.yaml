@@ -37,26 +37,25 @@ workflows:
       - name: Apply signing profiles to Xcode project
         script: xcode-project use-profiles --project "$XCODE_PROJECT"
 
-      - name: Increment build number
+      - name: Increment build number and build IPA
         script: |
-          PLIST="$CM_BUILD_DIR/ios/App/App/Info.plist"
-          PBXPROJ="$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
           LATEST_BUILD=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" 2>/dev/null || echo 0)
           NEW_BUILD=$(($LATEST_BUILD + 1))
           echo "Latest: $LATEST_BUILD → New: $NEW_BUILD"
-          # Set in Info.plist
+          # Force version in ALL places
+          PLIST="$CM_BUILD_DIR/ios/App/App/Info.plist"
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $NEW_BUILD" "$PLIST"
-          echo "Info.plist CFBundleVersion: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST")"
-          # Also set in pbxproj
-          sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*/CURRENT_PROJECT_VERSION = $NEW_BUILD/g" "$PBXPROJ"
-          echo "pbxproj updated"
-
-      - name: Build IPA
-        script: |
+          /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString 1.0.$NEW_BUILD" "$PLIST"
+          sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*/CURRENT_PROJECT_VERSION = $NEW_BUILD/g" "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
+          sed -i '' "s/MARKETING_VERSION = [0-9.]*/MARKETING_VERSION = 1.0.$NEW_BUILD/g" "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
+          echo "=== Verify ==="
+          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$PLIST"
+          grep "CURRENT_PROJECT_VERSION" "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj" | head -5
+          # Build with version override in xcargs
           xcode-project build-ipa \
             --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME" \
-            --archive-xcargs="DEVELOPMENT_TEAM=$TEAM_ID" \
+            --archive-xcargs="DEVELOPMENT_TEAM=$TEAM_ID CURRENT_PROJECT_VERSION=$NEW_BUILD MARKETING_VERSION=1.0.$NEW_BUILD" \
             --archive-flags="-destination 'generic/platform=iOS'"
 
     artifacts:
