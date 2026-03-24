@@ -39,14 +39,17 @@ workflows:
 
       - name: Increment build number
         script: |
-          cd $CM_BUILD_DIR/ios/App
+          PLIST="$CM_BUILD_DIR/ios/App/App/Info.plist"
+          PBXPROJ="$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
           LATEST_BUILD=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" 2>/dev/null || echo 0)
-          echo "Latest TestFlight build: $LATEST_BUILD"
           NEW_BUILD=$(($LATEST_BUILD + 1))
-          echo "Setting build number to: $NEW_BUILD"
-          agvtool new-version -all $NEW_BUILD
-          echo "Verifying:"
-          agvtool what-version
+          echo "Latest: $LATEST_BUILD → New: $NEW_BUILD"
+          # Set in Info.plist
+          /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $NEW_BUILD" "$PLIST"
+          echo "Info.plist CFBundleVersion: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' "$PLIST")"
+          # Also set in pbxproj
+          sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*/CURRENT_PROJECT_VERSION = $NEW_BUILD/g" "$PBXPROJ"
+          echo "pbxproj updated"
 
       - name: Build IPA
         script: |
