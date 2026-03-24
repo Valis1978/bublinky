@@ -39,20 +39,17 @@ workflows:
 
       - name: Increment build number and build IPA
         script: |
-          # Hardcoded floor — we already uploaded builds 1-3
-          NEW_BUILD=4
-          LATEST_BUILD=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" 2>/dev/null || true)
-          if [ -n "$LATEST_BUILD" ] && [ "$LATEST_BUILD" -ge 4 ] 2>/dev/null; then
-            NEW_BUILD=$(($LATEST_BUILD + 1))
-          fi
-          echo "Build number: $NEW_BUILD"
+          # Use Codemagic built-in auto-increment + offset for existing builds
+          # PROJECT_BUILD_NUMBER starts at 1 and increments each build
+          # We add 10 as offset to avoid conflicts with builds 1-4 already uploaded
+          NEW_BUILD=$(($PROJECT_BUILD_NUMBER + 10))
+          echo "PROJECT_BUILD_NUMBER=$PROJECT_BUILD_NUMBER → CFBundleVersion=$NEW_BUILD"
           # Patch Info.plist
           PLIST="$CM_BUILD_DIR/ios/App/App/Info.plist"
           /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $NEW_BUILD" "$PLIST"
-          /usr/libexec/PlistBuddy -c "Print :CFBundleVersion" "$PLIST"
           # Patch pbxproj
           sed -i '' "s/CURRENT_PROJECT_VERSION = [0-9]*/CURRENT_PROJECT_VERSION = $NEW_BUILD/g" "$CM_BUILD_DIR/$XCODE_PROJECT/project.pbxproj"
-          # Build with xcargs override
+          # Build
           xcode-project build-ipa \
             --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
             --scheme "$XCODE_SCHEME" \
