@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-const MODEL = 'gemini-2.0-flash-lite';
+const MODEL = 'gemini-3-flash-preview';
 
 export async function POST(req: NextRequest) {
   try {
@@ -47,7 +47,7 @@ Pravidla:
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.9,
-            maxOutputTokens: 4096,
+            maxOutputTokens: 16384,
             responseMimeType: 'application/json',
           },
         }),

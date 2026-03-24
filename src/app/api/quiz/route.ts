@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
-const MODEL = 'gemini-2.0-flash-lite';
+const MODEL = 'gemini-3-flash-preview';
 
 interface QuizQuestion {
   question: string;
@@ -63,7 +63,7 @@ Pravidla:
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.7,
-            maxOutputTokens: 4096,
+            maxOutputTokens: 8192,
             responseMimeType: 'application/json',
           },
         }),
