@@ -37,6 +37,12 @@ workflows:
       - name: Apply signing profiles to Xcode project
         script: xcode-project use-profiles --project "$XCODE_PROJECT"
 
+      - name: Increment build number
+        script: |
+          LATEST_BUILD=$(app-store-connect get-latest-testflight-build-number "$BUNDLE_ID" || echo 0)
+          agvtool new-version -all $(($LATEST_BUILD + 1))
+        working_directory: ios/App
+
       - name: Build IPA
         script: |
           xcode-project build-ipa \
