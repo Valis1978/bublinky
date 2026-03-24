@@ -196,7 +196,7 @@ export default function DadDashboard() {
                   style={{ border: '1px solid var(--border)' }}
                 >
                   <img
-                    src={`https://maps.googleapis.com/maps/api/staticmap?center=${lastLocation.latitude},${lastLocation.longitude}&zoom=15&size=600x200&markers=color:red%7C${lastLocation.latitude},${lastLocation.longitude}&key=AIzaSyBcMG64IkgbMLyOSsgRkzlAoYaX7jpWzaU`}
+                    src={`https://maps.googleapis.com/maps/api/staticmap?center=${lastLocation.latitude},${lastLocation.longitude}&zoom=15&size=600x200&markers=color:red%7C${lastLocation.latitude},${lastLocation.longitude}&key=${process.env.NEXT_PUBLIC_GOOGLE_MAPS_KEY || ''}`}
                     alt="Mapa"
                     className="w-full h-32 object-cover"
                     onError={(e) => {
