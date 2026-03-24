@@ -3,10 +3,12 @@ import { chatService } from '@/services/chat.service';
 import { createClient } from '@supabase/supabase-js';
 import type { MessageType } from '@/types/database';
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
+function getSupabaseAdmin() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    process.env.SUPABASE_SERVICE_ROLE_KEY || ''
+  );
+}
 
 export async function GET(request: NextRequest) {
   const userId = request.headers.get('x-user-id');
@@ -67,14 +69,14 @@ export async function POST(request: NextRequest) {
     // Send push notification to the OTHER user (parent only)
     try {
       // Get sender info
-      const { data: sender } = await supabaseAdmin
+      const { data: sender } = await getSupabaseAdmin()
         .from('bub_users')
         .select('name, role')
         .eq('id', userId)
         .single();
 
       // Find the parent user to notify (only notify parent, not child)
-      const { data: parent } = await supabaseAdmin
+      const { data: parent } = await getSupabaseAdmin()
         .from('bub_users')
         .select('id')
         .eq('role', 'parent')

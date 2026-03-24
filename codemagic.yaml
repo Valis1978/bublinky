@@ -6,6 +6,8 @@ workflows:
     integrations:
       app_store_connect: Bublinky
     environment:
+      groups:
+        - bublinky-env
       vars:
         XCODE_PROJECT: "ios/App/App.xcodeproj"
         XCODE_SCHEME: "App"
