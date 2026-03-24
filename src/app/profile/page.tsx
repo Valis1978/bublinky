@@ -190,6 +190,32 @@ export default function ProfilePage() {
           </div>
         </div>
 
+        {/* Dad Dashboard — only for parent */}
+        {user?.role === 'parent' && (
+          <div className="mb-6">
+            <Link
+              href="/dashboard"
+              className="glass-card p-4 flex items-center gap-3 transition-all active:scale-95 w-full"
+              style={{ border: '2px solid var(--accent)' }}
+            >
+              <div
+                className="w-12 h-12 rounded-xl flex items-center justify-center text-2xl"
+                style={{ background: 'var(--accent-soft)' }}
+              >
+                📊
+              </div>
+              <div>
+                <span className="font-bold text-sm block" style={{ color: 'var(--text-primary)' }}>
+                  Rodičovský Dashboard
+                </span>
+                <span className="text-xs" style={{ color: 'var(--text-muted)' }}>
+                  Aktivita, GPS, notifikace
+                </span>
+              </div>
+            </Link>
+          </div>
+        )}
+
         {/* More sections */}
         <div className="mb-6">
           <p className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>

@@ -89,16 +89,12 @@ export default function WeatherPage() {
           // Use Brno default
         }
 
-        const API_KEY = '0c8e4964238f3bdfa41eb7f25f7ba073'; // Free tier OWM
-        const [currentRes, forecastRes] = await Promise.all([
-          fetch(`https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric&lang=cz`),
-          fetch(`https://api.openweathermap.org/data/2.5/forecast?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric&lang=cz`),
-        ]);
-
-        if (!currentRes.ok || !forecastRes.ok) throw new Error('API chyba');
-
-        const current = await currentRes.json();
-        const forecast = await forecastRes.json();
+        // Fetch via our server-side proxy (avoids CORS + hides API key)
+        const weatherRes = await fetch(`/api/weather?lat=${lat}&lon=${lon}`);
+        if (!weatherRes.ok) throw new Error('API chyba');
+        const weatherData = await weatherRes.json();
+        if (!weatherData.success) throw new Error(weatherData.error || 'API chyba');
+        const { current, forecast } = weatherData;
 
         // Process 5-day forecast (take noon readings)
         const dailyMap = new Map<string, ForecastDay>();
