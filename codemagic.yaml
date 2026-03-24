@@ -13,7 +13,7 @@ workflows:
         XCODE_SCHEME: "App"
         BUNDLE_ID: "cz.bublinky.app"
         TEAM_ID: "578588C5PF"
-      node: v20.14.0
+      node: v22.0.0
       xcode: latest
     scripts:
       - name: Install dependencies
