@@ -3,6 +3,7 @@
 import { useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useMessages } from '@/hooks/useMessages';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
 import { motion } from 'framer-motion';
@@ -10,6 +11,8 @@ import { motion } from 'framer-motion';
 export function ChatView() {
   const { user } = useAuth();
   const { messages, loading, sendMessage, markAsRead } = useMessages(user?.id);
+  // Subscribe to push notifications — only parent gets them
+  usePushNotifications(user?.role === 'parent' ? user.id : null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 

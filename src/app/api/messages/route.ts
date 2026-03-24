@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { chatService } from '@/services/chat.service';
+import { createClient } from '@supabase/supabase-js';
 import type { MessageType } from '@/types/database';
+
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+);
 
 export async function GET(request: NextRequest) {
   const userId = request.headers.get('x-user-id');
@@ -56,6 +62,41 @@ export async function POST(request: NextRequest) {
 
     if (error) {
       return NextResponse.json({ success: false, error }, { status: 500 });
+    }
+
+    // Send push notification to the OTHER user (parent only)
+    try {
+      // Get sender info
+      const { data: sender } = await supabaseAdmin
+        .from('bub_users')
+        .select('name, role')
+        .eq('id', userId)
+        .single();
+
+      // Find the parent user to notify (only notify parent, not child)
+      const { data: parent } = await supabaseAdmin
+        .from('bub_users')
+        .select('id')
+        .eq('role', 'parent')
+        .neq('id', userId)
+        .single();
+
+      if (parent && sender?.role === 'child') {
+        // Only send push when CHILD sends message to PARENT
+        const baseUrl = request.headers.get('origin') || process.env.NEXT_PUBLIC_APP_URL || '';
+        fetch(`${baseUrl}/api/notifications/send`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            recipientId: parent.id,
+            title: `💬 ${sender.name || 'Viki'}`,
+            body: content?.substring(0, 100) || (type === 'photo' ? '📷 Fotka' : type === 'video' ? '🎥 Video' : '🎤 Hlasovka'),
+            url: '/chat',
+          }),
+        }).catch(() => {}); // Fire and forget
+      }
+    } catch {
+      // Non-critical, don't fail the message
     }
 
     return NextResponse.json({ success: true, data });
