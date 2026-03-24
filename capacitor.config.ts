@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Bublinky',
   webDir: 'public', // Minimal placeholder — app loads from server URL
   server: {
-    url: 'https://bublinky.cz',
+    url: 'https://bublinky.mujagent.cz',
     cleartext: false,
   },
   plugins: {
