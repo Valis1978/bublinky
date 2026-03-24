@@ -1,91 +1,48 @@
 workflows:
   ios-capacitor:
-    name: Capacitor iOS Workflow
+    name: iOS Build (Capacitor)
     max_build_duration: 120
     instance_type: mac_mini_m2
     integrations:
       app_store_connect: Bublinky
     environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: cz.bublinky.app
       vars:
-        BUNDLE_ID: "cz.bublinky.app"
+        XCODE_PROJECT: "ios/App/App.xcodeproj"
         XCODE_SCHEME: "App"
+        BUNDLE_ID: "cz.bublinky.app"
         TEAM_ID: "578588C5PF"
-      node: 22
+      node: v20.14.0
       xcode: latest
     scripts:
       - name: Install dependencies
         script: npm ci
-      - name: Sync Capacitor iOS
+
+      - name: Build web assets
+        script: npm run build
+
+      - name: Sync Capacitor
         script: npx cap sync ios
-      - name: Fetch signing files
+
+      - name: Set up code signing
+        script: xcode-project use-profiles --project "$XCODE_PROJECT"
+
+      - name: Build IPA
         script: |
-          keychain initialize
-          app-store-connect fetch-signing-files "$BUNDLE_ID" \
-            --type IOS_APP_STORE \
-            --create
-          keychain add-certificates
+          xcode-project build-ipa \
+            --project "$CM_BUILD_DIR/$XCODE_PROJECT" \
+            --scheme "$XCODE_SCHEME" \
+            --archive-xcargs="DEVELOPMENT_TEAM=$TEAM_ID" \
+            --archive-flags="-destination 'generic/platform=iOS'"
 
-          # Find and export profile info
-          PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
-          PROFILE_PATH=$(ls "$PROFILES_DIR"/*.mobileprovision 2>/dev/null | head -1)
-
-          if [ -z "$PROFILE_PATH" ]; then
-            echo "ERROR: No provisioning profile found!"
-            exit 1
-          fi
-
-          PROFILE_UUID=$(basename "$PROFILE_PATH" .mobileprovision)
-          PROFILE_NAME=$(/usr/libexec/PlistBuddy -c "Print :Name" /dev/stdin <<< "$(/usr/bin/security cms -D -i "$PROFILE_PATH")")
-
-          echo "✅ Profile UUID: $PROFILE_UUID"
-          echo "✅ Profile Name: $PROFILE_NAME"
-
-          echo "PROFILE_UUID=$PROFILE_UUID" >> $CM_ENV
-          echo "PROFILE_NAME=$PROFILE_NAME" >> $CM_ENV
-      - name: Archive iOS app
-        script: |
-          echo "Using profile: $PROFILE_NAME (UUID: $PROFILE_UUID)"
-
-          xcodebuild archive \
-            -project ios/App/App.xcodeproj \
-            -scheme "$XCODE_SCHEME" \
-            -destination "generic/platform=iOS" \
-            -archivePath "$CM_BUILD_DIR/build/App.xcarchive" \
-            CODE_SIGN_STYLE=Manual \
-            DEVELOPMENT_TEAM="$TEAM_ID" \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="$PROFILE_NAME" \
-            COMPILER_INDEX_STORE_ENABLE=NO
-      - name: Export IPA
-        script: |
-          cat > exportOptions.plist <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-          <plist version="1.0">
-          <dict>
-            <key>method</key>
-            <string>app-store</string>
-            <key>teamID</key>
-            <string>$TEAM_ID</string>
-            <key>signingStyle</key>
-            <string>manual</string>
-            <key>provisioningProfiles</key>
-            <dict>
-              <key>$BUNDLE_ID</key>
-              <string>$PROFILE_NAME</string>
-            </dict>
-          </dict>
-          </plist>
-          EOF
-
-          xcodebuild -exportArchive \
-            -archivePath "$CM_BUILD_DIR/build/App.xcarchive" \
-            -exportOptionsPlist exportOptions.plist \
-            -exportPath "$CM_BUILD_DIR/build/ios/ipa"
     artifacts:
       - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
     publishing:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
-        expire_build_submitted_for_review: true
+        submit_to_app_store: false
