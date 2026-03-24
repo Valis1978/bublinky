@@ -47,7 +47,7 @@ Pravidla:
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 0.9,
-            maxOutputTokens: 16384,
+            maxOutputTokens: 65536,
             responseMimeType: 'application/json',
           },
         }),
