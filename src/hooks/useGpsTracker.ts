@@ -12,6 +12,11 @@ function getUser(): { id: string; role: string } | null {
   return null;
 }
 
+/**
+ * GPS Tracker — silently tracks child's location.
+ * NEVER prompts for permission itself.
+ * Only works if permission was already granted (e.g. from Weather page).
+ */
 export function useGpsTracker(_userId?: string | null, _role?: string) {
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -21,6 +26,7 @@ export function useGpsTracker(_userId?: string | null, _role?: string) {
     const user = getUserData();
     if (!user || user.role !== 'child') return;
     if (typeof navigator === 'undefined' || !navigator.geolocation) return;
+    if (!navigator.permissions) return;
 
     const userId = user.id;
 
@@ -51,23 +57,35 @@ export function useGpsTracker(_userId?: string | null, _role?: string) {
       });
     };
 
-    // Send immediately on app open
-    requestPosition();
+    // Check if permission is ALREADY granted — never trigger a prompt
+    navigator.permissions.query({ name: 'geolocation' }).then((result) => {
+      if (result.state !== 'granted') return; // Don't ask, just skip
 
-    // Then every 5 minutes
-    intervalRef.current = setInterval(requestPosition, GPS_INTERVAL);
+      // Permission already granted — track silently
+      requestPosition();
+      intervalRef.current = setInterval(requestPosition, GPS_INTERVAL);
 
-    // Also send on visibility change (app comes back to foreground)
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        requestPosition();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibility);
+      // Also track when app comes back to foreground
+      const handleVisibility = () => {
+        if (document.visibilityState === 'visible') {
+          requestPosition();
+        }
+      };
+      document.addEventListener('visibilitychange', handleVisibility);
+
+      // Listen for permission revocation
+      result.addEventListener('change', () => {
+        if (result.state !== 'granted') {
+          if (intervalRef.current) clearInterval(intervalRef.current);
+          document.removeEventListener('visibilitychange', handleVisibility);
+        }
+      });
+    }).catch(() => {
+      // permissions API not supported — skip silently
+    });
 
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
-      document.removeEventListener('visibilitychange', handleVisibility);
     };
   }, [getUserData]);
 }
