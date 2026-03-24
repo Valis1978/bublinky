@@ -121,7 +121,7 @@ export function ChatView() {
       <div
         ref={scrollRef}
         className="flex-1 overflow-y-auto py-4"
-        style={{ paddingBottom: '80px' }}
+        style={{ paddingBottom: 'calc(8rem + env(safe-area-inset-bottom, 0px))' }}
       >
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full gap-3 px-8">
@@ -169,8 +169,11 @@ export function ChatView() {
         <div ref={bottomRef} />
       </div>
 
-      {/* Input area */}
-      <div className="fixed bottom-16 left-0 right-0 z-40">
+      {/* Input area — above BottomNav (h-16 + safe-area) */}
+      <div
+        className="fixed left-0 right-0 z-40"
+        style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}
+      >
         <MessageInput onSend={handleSend} onPhoto={handlePhoto} onVideo={handleVideo} onVoice={handleVoice} />
       </div>
     </div>
