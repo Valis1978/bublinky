@@ -279,8 +279,8 @@ export default function PetPage() {
         </div>
       </div>
 
-      {/* Tab content */}
-      <div className="flex-1 overflow-hidden">
+      {/* Tab content — extra padding for PetTabBar (40px) + BottomNav (64px) */}
+      <div className="flex-1 overflow-hidden" style={{ paddingBottom: '120px' }}>
         {tab === 'home' && (
           <div className="h-full overflow-y-auto pb-2">
             {/* Pet display area */}
@@ -403,10 +403,8 @@ export default function PetPage() {
         )}
       </div>
 
-      {/* Pet tab bar */}
+      {/* Both are fixed positioned */}
       <PetTabBar active={tab} onChange={setTab} />
-
-      {/* Bottom nav */}
       <BottomNav />
     </div>
   );
