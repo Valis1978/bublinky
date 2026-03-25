@@ -74,6 +74,8 @@ export async function PUT(req: NextRequest) {
       food_bravery: pet.foodBravery || 0,
       foods_tried: pet.foodsTried || [],
       favorite_foods: pet.favoriteFoods || [],
+      english_level: pet.englishLevel || 0,
+      english_words_learned: pet.englishWordsLearned || [],
       updated_at: new Date().toISOString(),
     };
 

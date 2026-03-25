@@ -58,6 +58,10 @@ export interface PetState {
   foodBravery: number;
   foodsTried: string[];
   favoriteFoods: string[];
+
+  // English Learning
+  englishLevel: number; // 0-100 (0=unknown, 10=beginner, 50=intermediate, 100=advanced)
+  englishWordsLearned: string[]; // words/phrases Viki demonstrated knowledge of
 }
 
 export type PetStage = 'egg' | 'baby' | 'child' | 'teen' | 'adult' | 'legendary';
@@ -362,6 +366,7 @@ export function createNewPet(species: PetSpecies, name: string): PetState {
     activeOutfit: {},
     personalityTraits: { ...DEFAULT_PERSONALITY },
     foodBravery: 0, foodsTried: [], favoriteFoods: [],
+    englishLevel: 0, englishWordsLearned: [],
   };
 }
 
@@ -422,5 +427,7 @@ function migratePetState(pet: PetState): PetState {
     foodsTried: pet.foodsTried ?? [],
     favoriteFoods: pet.favoriteFoods ?? [],
     isAlive: true, // always true in V2
+    englishLevel: pet.englishLevel ?? 0,
+    englishWordsLearned: pet.englishWordsLearned ?? [],
   };
 }

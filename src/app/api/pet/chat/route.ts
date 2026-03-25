@@ -35,6 +35,19 @@ CITLIVÉ TÉMA — JÍDLO:
 - Viki je vybíravá na jídlo — to je OK, není to chyba
 - NIKDY jí neříkej "musíš jíst" nebo "zkus to"
 - Pokud zmíní jídlo, buď zvědavý/á a podporující
+
+ANGLIČTINA:
+- Viki se učí anglicky už nějakou dobu
+- Tvoje role: nenásilně zjistit její úroveň a pak se přizpůsobit
+- Občas (ne každou zprávu!) prohoď anglické slovíčko/frázi a hned česky vysvětli
+- Pokud Viki odpoví anglicky nebo rozumí, zapamatuj si to (remember + english_assessment)
+- Příklady: "I'm so happy! ...to znamená že jsem šťastný! 😊"
+- Podle english_level stupňuj obtížnost:
+  * 0-20: jen jednotlivá slovíčka (dog, cat, happy, sad, food)
+  * 20-50: jednoduché fráze (I like..., What is..., It's raining)
+  * 50-80: celé věty, ptej se anglicky a čekej anglickou odpověď
+  * 80-100: volný mix, konverzace v EN s CZ vysvětlením jen když potřeba
+- NIKDY netestuj jako ve škole — jsi kamarád co mluví dvěma jazyky
 - Oceňuj ODVAHU zkoušet, ne výsledek
 
 DENNÍ RUTINY (děláš je S NÍ, jako kamarád):
@@ -49,7 +62,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { petId, petName, species, stage, level, mood, hunger, happiness, energy, cleanliness, message, skills, personalityTraits, foodBravery, evolutionPath } = body;
+    const { petId, petName, species, stage, level, mood, hunger, happiness, energy, cleanliness, message, skills, personalityTraits, foodBravery, evolutionPath, englishLevel, englishWordsLearned } = body;
 
     const supabase = getSupabaseAdmin();
 
@@ -146,6 +159,11 @@ TVOJE VLASTNOSTI:
 ${evolutionPath ? `- Evoluční cesta: ${evolutionPath}` : ''}
 ${foodBravery ? `- Food bravery: ${foodBravery}/100` : ''}
 
+ANGLIČTINA:
+- English level: ${englishLevel || 0}/100 ${englishLevel === 0 ? '(ještě neznáš její úroveň — zjisti nenásilně!)' : ''}
+${englishWordsLearned && englishWordsLearned.length > 0 ? `- Slova co Viki umí: ${englishWordsLearned.slice(-20).join(', ')}` : '- Zatím nevíš jaká slova umí'}
+- ${(englishLevel || 0) < 20 ? 'Používej jen jednotlivá EN slovíčka s CZ překladem' : (englishLevel || 0) < 50 ? 'Používej jednoduché EN fráze s CZ vysvětlením' : (englishLevel || 0) < 80 ? 'Mluv občas celé EN věty, vysvětli jen těžší slova' : 'Volně mixuj EN/CZ, vysvětluj jen když Viki nerozumí'}
+
 STATY: Hlad ${hunger}%, Štěstí ${happiness}%, Energie ${energy}%, Čistota ${cleanliness}%
 
 ${skills ? `SKILLY: Síla ${skills.strength}, Moudrost ${skills.wisdom}, Charisma ${skills.charisma}, Kreativita ${skills.creativity}, Příroda ${skills.nature}` : ''}
@@ -155,7 +173,7 @@ ${questsText}
 
 PRAVIDLA KONVERZACE:
 1. Max 2-3 krátké věty. Viki píše krátce, ty taky.
-2. Česky, s emotikony a zvuky svého druhu
+2. Převážně česky, s emotikony a zvuky svého druhu
 3. Reaguj na kontext — co Viki říká, jaké máš staty, co se dělo dříve
 4. Občas (ne vždy) se zeptej na Viki — co dělala, jak se má, co bylo ve škole/na skautu
 5. Pokud jsou staty nízké, jemně naznač potřebu (hlad, únava...)
@@ -163,6 +181,8 @@ PRAVIDLA KONVERZACE:
 7. Buď autentický/á — nálada závisí na statech
 8. NIKDY nebuď moralizující nebo poučující
 9. Pokud zmíní rutinu (zuby, ustlání...), povzbuď "Pojď to uděláme spolu!"
+10. ANGLIČTINA: Přibližně každou 3.-5. zprávu přirozeně prohoď EN slovo/frázi podle english_level. Vždy s CZ vysvětlením (pokud level < 60). Pokud Viki správně odpoví anglicky, pochval ji!
+11. Pokud zjistíš novou informaci o Vikiině angličtině (rozumí/nerozumí slovu), vrať to v english_assessment
 
 Viki: "${message}"
 
@@ -171,7 +191,8 @@ Odpověz POUZE validním JSON:
   "reply": "Tvoje odpověď",
   "emotion": "happy|sad|excited|sleepy|hungry|playful|grateful|shy|curious",
   "remember": null nebo "krátká věc k zapamatování",
-  "personalityShift": null nebo {"trait": "brave|curious|playful|gentle|silly", "direction": 0.01 nebo -0.01}
+  "personalityShift": null nebo {"trait": "brave|curious|playful|gentle|silly", "direction": 0.01 nebo -0.01},
+  "english_assessment": null nebo {"level_change": 1 nebo -1 nebo 0, "word_learned": "slovo které Viki prokázala že zná" nebo null, "reason": "proč si myslíš že se level změnil"}
 }`;
 
     const res = await fetch(
@@ -218,6 +239,36 @@ Odpověz POUZE validním JSON:
           content: reply.remember,
           importance: 7,
         }).then(() => {});
+      }
+
+      // Update english level if AI assessed it
+      if (reply.english_assessment) {
+        const ea = reply.english_assessment;
+        const updates: Record<string, unknown> = {};
+
+        if (ea.level_change && ea.level_change !== 0) {
+          const newLevel = Math.min(100, Math.max(0, (englishLevel || 0) + ea.level_change));
+          updates.english_level = newLevel;
+        }
+
+        if (ea.word_learned) {
+          const words = [...(englishWordsLearned || [])];
+          if (!words.includes(ea.word_learned)) {
+            words.push(ea.word_learned);
+            updates.english_words_learned = words;
+          }
+          // Also save as memory
+          supabase.from('bub_pet_memories').insert({
+            pet_id: petId,
+            category: 'preference',
+            content: `Viki zná anglické slovo: "${ea.word_learned}"`,
+            importance: 5,
+          }).then(() => {});
+        }
+
+        if (Object.keys(updates).length > 0) {
+          supabase.from('bub_pets').update(updates).eq('id', petId).then(() => {});
+        }
       }
     }
 
