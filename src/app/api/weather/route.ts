@@ -38,16 +38,19 @@ function weatherCodeToInfo(code: number, isDay = true): { description: string; i
 // Reverse geocode to get city name
 async function getCityName(lat: number, lon: number): Promise<string> {
   try {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 3000);
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&zoom=10`,
-      { headers: { 'User-Agent': 'Bublinky/1.0' } }
+      { headers: { 'User-Agent': 'Bublinky/1.0' }, signal: controller.signal }
     );
+    clearTimeout(timeout);
     if (res.ok) {
       const data = await res.json();
-      return data.address?.city || data.address?.town || data.address?.village || 'Neznámé místo';
+      return data.address?.city || data.address?.town || data.address?.village || 'Brno';
     }
-  } catch { /* fallback */ }
-  return 'Neznámé místo';
+  } catch { /* timeout or error — fallback */ }
+  return 'Brno';
 }
 
 export async function GET(req: NextRequest) {

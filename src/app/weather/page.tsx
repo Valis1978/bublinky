@@ -85,13 +85,20 @@ export default function WeatherPage() {
         let lat = 49.1951;
         let lon = 16.6068;
 
-        try {
-          const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
-            navigator.geolocation.getCurrentPosition(resolve, reject, { timeout: 5000 });
-          });
-          lat = pos.coords.latitude;
-          lon = pos.coords.longitude;
-        } catch { /* Brno default */ }
+        // Quick geolocation — don't block if unavailable
+        if (navigator.geolocation) {
+          try {
+            const pos = await new Promise<GeolocationPosition>((resolve, reject) => {
+              navigator.geolocation.getCurrentPosition(resolve, reject, {
+                timeout: 3000,
+                maximumAge: 300000, // Cache 5 min
+                enableHighAccuracy: false,
+              });
+            });
+            lat = pos.coords.latitude;
+            lon = pos.coords.longitude;
+          } catch { /* Brno default — silent */ }
+        }
 
         const weatherRes = await fetch(`/api/weather?lat=${lat}&lon=${lon}`);
         if (!weatherRes.ok) throw new Error('API chyba');
