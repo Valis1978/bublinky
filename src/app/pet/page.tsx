@@ -17,6 +17,10 @@ import { PetTabBar, type PetTab } from '@/components/pet/PetTabBar';
 import { SpeechBubble } from '@/components/pet/SpeechBubble';
 import { PetChatPanel } from '@/components/pet/PetChatPanel';
 import { SkillTree } from '@/components/pet/SkillTree';
+import {
+  getRoutinesByTime, getCurrentTimeOfDay, getCompletedRoutines,
+  completeRoutine, getRoutineStreak, type RoutineStep,
+} from '@/lib/routine-engine';
 
 type View = 'setup' | 'main';
 
@@ -370,15 +374,14 @@ export default function PetPage() {
         )}
 
         {tab === 'quests' && (
-          <div className="h-full overflow-y-auto p-4">
-            <div className="text-center py-12 space-y-3">
-              <span className="text-5xl">⭐</span>
-              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Questy brzy!</h3>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                Denní úkoly a dobrodružství se připravují...
-              </p>
-            </div>
-          </div>
+          <QuestsPanel pet={pet} onXpGain={(xp) => {
+            setPet(prev => {
+              if (!prev) return prev;
+              const updated = { ...prev, xp: prev.xp + xp };
+              savePet(updated);
+              return updated;
+            });
+          }} />
         )}
 
         {tab === 'inventory' && (
@@ -406,6 +409,117 @@ export default function PetPage() {
       {/* Both are fixed positioned */}
       <PetTabBar active={tab} onChange={setTab} />
       <BottomNav />
+    </div>
+  );
+}
+
+// ═══════════════ QUESTS PANEL ═══════════════
+function QuestsPanel({ pet, onXpGain }: { pet: PetState; onXpGain: (xp: number) => void }) {
+  const [completed, setCompleted] = useState<string[]>([]);
+  const [streak, setStreak] = useState(0);
+  const [celebrateId, setCelebrateId] = useState<string | null>(null);
+
+  useEffect(() => {
+    setCompleted(getCompletedRoutines());
+    setStreak(getRoutineStreak());
+  }, []);
+
+  const timeOfDay = getCurrentTimeOfDay();
+  const timeLabel = timeOfDay === 'morning' ? '🌅 Ráno' : timeOfDay === 'afternoon' ? '☀️ Odpoledne' : '🌙 Večer';
+  const routines = getRoutinesByTime(timeOfDay);
+  const allRoutines = [
+    { time: 'morning' as const, label: '🌅 Ráno', routines: getRoutinesByTime('morning') },
+    { time: 'afternoon' as const, label: '☀️ Odpoledne', routines: getRoutinesByTime('afternoon') },
+    { time: 'evening' as const, label: '🌙 Večer', routines: getRoutinesByTime('evening') },
+  ];
+
+  const handleComplete = (routine: RoutineStep) => {
+    if (completed.includes(routine.id)) return;
+    const updated = completeRoutine(routine.id);
+    setCompleted(updated);
+    onXpGain(routine.xpReward);
+    setCelebrateId(routine.id);
+    setTimeout(() => setCelebrateId(null), 1500);
+    setStreak(getRoutineStreak());
+  };
+
+  const totalToday = completed.length;
+
+  return (
+    <div className="h-full overflow-y-auto p-4 space-y-4">
+      {/* Streak + progress */}
+      <div className="rounded-2xl p-4 text-center" style={{ background: 'var(--bg-card)', boxShadow: 'var(--shadow)' }}>
+        <div className="flex items-center justify-center gap-4">
+          <div>
+            <p className="text-2xl font-black" style={{ color: 'var(--accent)' }}>{totalToday}</p>
+            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Dnes splněno</p>
+          </div>
+          {streak > 0 && (
+            <div>
+              <p className="text-2xl font-black" style={{ color: '#F59E0B' }}>🔥 {streak}</p>
+              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Dní v řadě</p>
+            </div>
+          )}
+        </div>
+        {totalToday === 0 && (
+          <p className="text-xs mt-2" style={{ color: 'var(--text-muted)' }}>
+            {pet.name} chce dělat věci s tebou! Klikni na úkol 🐾
+          </p>
+        )}
+      </div>
+
+      {/* Current time section highlighted */}
+      {allRoutines.map(section => (
+        <div key={section.time}>
+          <h3 className="text-xs font-bold mb-2 flex items-center gap-1"
+            style={{ color: section.time === timeOfDay ? 'var(--accent)' : 'var(--text-muted)' }}>
+            {section.label}
+            {section.time === timeOfDay && <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: 'var(--accent-soft)' }}>teď</span>}
+          </h3>
+          <div className="space-y-2">
+            {section.routines.map(routine => {
+              const isDone = completed.includes(routine.id);
+              const isCelebrating = celebrateId === routine.id;
+
+              return (
+                <motion.button
+                  key={routine.id}
+                  whileTap={isDone ? {} : { scale: 0.97 }}
+                  onClick={() => handleComplete(routine)}
+                  disabled={isDone}
+                  className="w-full flex items-center gap-3 p-3 rounded-2xl text-left transition-all"
+                  style={{
+                    background: isDone ? 'var(--accent-soft)' : 'var(--bg-card)',
+                    boxShadow: isDone ? 'none' : 'var(--shadow)',
+                    opacity: isDone ? 0.7 : 1,
+                  }}
+                >
+                  <motion.span
+                    className="text-xl flex-shrink-0"
+                    animate={isCelebrating ? { scale: [1, 1.5, 1], rotate: [0, 10, -10, 0] } : {}}
+                  >
+                    {isDone ? '✅' : routine.emoji}
+                  </motion.span>
+                  <div className="flex-1 min-w-0">
+                    <p className={`text-sm font-medium ${isDone ? 'line-through' : ''}`}
+                      style={{ color: 'var(--text-primary)' }}>
+                      {routine.label}
+                    </p>
+                    <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
+                      {isDone ? '🐾 Hotovo!' : routine.petMessage}
+                    </p>
+                  </div>
+                  {!isDone && (
+                    <span className="text-[9px] font-bold flex-shrink-0" style={{ color: 'var(--accent)' }}>
+                      +{routine.xpReward} XP
+                    </span>
+                  )}
+                </motion.button>
+              );
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
