@@ -59,9 +59,10 @@ export function getCurrentTimeOfDay(): 'morning' | 'afternoon' | 'evening' {
   return 'evening';
 }
 
-/** Get today's date key for tracking completions */
+/** Get today's date key for tracking completions (local timezone, not UTC) */
 export function getTodayKey(): string {
-  return new Date().toISOString().split('T')[0];
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
 /** Load completed routines for today from localStorage */

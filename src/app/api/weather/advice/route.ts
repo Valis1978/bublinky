@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { safeParseJSON } from '@/lib/safe-json';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-3-flash-preview';
@@ -57,7 +58,10 @@ Odpověz POUZE validním JSON, nic jiného.`;
       return NextResponse.json({ success: false, error: 'Empty AI response' }, { status: 502 });
     }
 
-    const advice = JSON.parse(text);
+    const advice = safeParseJSON<{ outfit: string; tip: string; mood: string; funFact: string }>(text);
+    if (!advice || !advice.outfit) {
+      return NextResponse.json({ success: false, error: 'Invalid AI response' }, { status: 502 });
+    }
     return NextResponse.json({ success: true, advice });
   } catch (err) {
     return NextResponse.json({ success: false, error: String(err) }, { status: 500 });

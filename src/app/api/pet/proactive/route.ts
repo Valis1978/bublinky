@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getFamilyContext, getCustodyInfo, getDogNickname } from '@/lib/custody-calendar';
+import { safeParseJSON } from '@/lib/safe-json';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-3-flash-preview';
@@ -69,8 +70,13 @@ export async function POST(req: NextRequest) {
     else if (hour >= 19 && hour < 21) messageType = 'evening_routine';
     else if (hour >= 12 && hour < 14) messageType = 'afternoon';
     else if (questInfo) messageType = 'quest_reminder';
-    else if (Math.random() < 0.3) messageType = 'food_curiosity';
-    else if (Math.random() < 0.3) messageType = 'fun_fact';
+    else {
+      // Single random roll for fair distribution
+      const r = Math.random();
+      if (r < 0.3) messageType = 'food_curiosity';
+      else if (r < 0.6) messageType = 'fun_fact';
+      // else stays 'greeting'
+    }
 
     const prompt = `Jsi ${petName} (${species}), mazlíček 10leté Viki. Vygeneruj JEDNU krátkou proaktivní zprávu.
 
@@ -123,7 +129,11 @@ Odpověz POUZE validním JSON:
       return NextResponse.json({ success: false, error: 'Empty response' }, { status: 502 });
     }
 
-    return NextResponse.json({ success: true, ...JSON.parse(text) });
+    const parsed = safeParseJSON<{ message: string; emotion?: string; type?: string }>(text);
+    if (!parsed || !parsed.message) {
+      return NextResponse.json({ success: false, error: 'Invalid AI response' }, { status: 502 });
+    }
+    return NextResponse.json({ success: true, ...parsed });
   } catch (err) {
     return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
   }

@@ -39,6 +39,8 @@ export interface PetState {
   lastPlayed: string;
   lastSlept: string;
   lastBathed: string;
+  lastTreated: string;
+  lastChatted: string;
 
   // State
   isAlive: boolean; // deprecated — kept for compat, always true
@@ -109,6 +111,7 @@ export const ACTIONS = {
   bathe: { hunger: 0, happiness: -5, energy: -5, cleanliness: 40, xp: 5, cooldown: 45, skill: null, skillXp: 0 },
   treat: { hunger: 10, happiness: 15, energy: 5, cleanliness: 0, xp: 8, cooldown: 60, skill: 'charisma' as keyof SkillBranch, skillXp: 1 },
   chat:  { hunger: 0, happiness: 10, energy: -3, cleanliness: 0, xp: 5, cooldown: 5, skill: 'charisma' as keyof SkillBranch, skillXp: 2 },
+  wake:  { hunger: 0, happiness: 5, energy: -10, cleanliness: 0, xp: 2, cooldown: 10, skill: null, skillXp: 0 },
 };
 
 const DEFAULT_PERSONALITY: Record<string, number> = {
@@ -205,9 +208,10 @@ export function applyDecay(pet: PetState): PetState {
 
   const now = Date.now();
   const last = new Date(pet.lastUpdate).getTime();
+  if (isNaN(last)) return pet; // corrupted timestamp — skip decay
   const hoursPassed = Math.min((now - last) / (1000 * 60 * 60), 48);
 
-  if (hoursPassed < 0.05) return pet; // less than 3 minutes
+  if (hoursPassed < 0.05 || isNaN(hoursPassed)) return pet; // less than 3 minutes or invalid
 
   const updated = { ...pet, skills: { ...pet.skills }, personalityTraits: { ...pet.personalityTraits } };
 
@@ -254,16 +258,21 @@ export function performAction(
   if (pet.isOnVacation) {
     return { pet, message: `${pet.name} je na výletě! Vrátí se brzy! 🏖️`, blocked: true };
   }
-  if (pet.isSleeping && action !== 'feed') {
+  if (pet.isSleeping && action !== 'feed' && action !== 'wake') {
     return { pet, message: 'Pššš... spí! 💤', blocked: true };
   }
 
   const effect = ACTIONS[action];
 
-  // Check cooldown
+  // Check cooldown — each action has its own timestamp
   const lastActionMap: Record<string, string> = {
-    feed: pet.lastFed, play: pet.lastPlayed, sleep: pet.lastSlept,
-    bathe: pet.lastBathed, treat: pet.lastFed, chat: pet.lastUpdate,
+    feed: pet.lastFed,
+    play: pet.lastPlayed,
+    sleep: pet.lastSlept,
+    bathe: pet.lastBathed,
+    treat: pet.lastTreated || pet.lastFed, // fallback for V1 compat
+    chat: pet.lastChatted || pet.born,     // fallback: never chatted
+    wake: pet.lastSlept,
   };
   const lastActionTime = lastActionMap[action] || pet.lastUpdate;
 
@@ -297,7 +306,14 @@ export function performAction(
   if (action === 'play') updated.lastPlayed = now;
   if (action === 'sleep') { updated.lastSlept = now; updated.isSleeping = true; }
   if (action === 'bathe') updated.lastBathed = now;
+  if (action === 'treat') updated.lastTreated = now;
+  if (action === 'chat') updated.lastChatted = now;
+  if (action === 'wake') { updated.isSleeping = false; }
   updated.lastUpdate = now;
+
+  // Earn coins from actions (small amounts to keep economy flowing)
+  const coinRewards: Record<string, number> = { feed: 1, play: 2, bathe: 1, treat: 0, chat: 1, wake: 0, sleep: 0 };
+  updated.coins += coinRewards[action] || 0;
 
   // Level up check
   while (updated.xp >= xpForLevel(updated.level + 1)) {
@@ -328,6 +344,7 @@ export function performAction(
       bathe: ['Brrr, studená! 🚿', 'Teď jsem čistý! ✨', 'Bubliny! 🫧', '*otřepe se* 💦'],
       treat: ['Pamlsek! 🍬', 'Ty jsi nejlepší! 💕', 'Miluju tě! 🥰', 'Wow! 🌟'],
       chat: ['Rád/a si povídám! 💬', 'To je zajímavé! 🤔', 'Díky za pokec! ❤️', 'Povídej dál! 😊'],
+      wake: ['*zívá* Dobré ráno! ☀️', 'Už jsem vzhůru! 🌅', '*protahuje se* Ahoj! 🤗'],
     };
     const pool = messages[action] || ['❤️'];
     message = pool[Math.floor(Math.random() * pool.length)];
@@ -358,7 +375,7 @@ export function createNewPet(species: PetSpecies, name: string): PetState {
     xp: 0, level: 0, stage: 'egg', coins: 50,
     skills: { ...DEFAULT_SKILLS },
     evolutionPath: null,
-    lastUpdate: now, lastFed: now, lastPlayed: now, lastSlept: now, lastBathed: now,
+    lastUpdate: now, lastFed: now, lastPlayed: now, lastSlept: now, lastBathed: now, lastTreated: now, lastChatted: now,
     isAlive: true, isSleeping: false,
     isOnVacation: false, vacationReturn: null,
     mood: 'happy',
@@ -414,20 +431,36 @@ export function loadPet(): PetState | null {
 
 /** Migrate V1 pet state to V2 (backward compatible) */
 function migratePetState(pet: PetState): PetState {
+  const now = new Date().toISOString();
   return {
     ...pet,
     coins: pet.coins ?? 50,
-    skills: pet.skills ?? { ...DEFAULT_SKILLS },
+    // Merge skills: fill missing branches with 0 (fixes NaN bug)
+    skills: { ...DEFAULT_SKILLS, ...(pet.skills ?? {}) },
     evolutionPath: pet.evolutionPath ?? null,
     isOnVacation: pet.isOnVacation ?? false,
     vacationReturn: pet.vacationReturn ?? null,
     activeOutfit: pet.activeOutfit ?? {},
-    personalityTraits: pet.personalityTraits ?? { ...DEFAULT_PERSONALITY },
+    personalityTraits: { ...DEFAULT_PERSONALITY, ...(pet.personalityTraits ?? {}) },
     foodBravery: pet.foodBravery ?? 0,
     foodsTried: pet.foodsTried ?? [],
     favoriteFoods: pet.favoriteFoods ?? [],
-    isAlive: true, // always true in V2
+    isAlive: true,
     englishLevel: pet.englishLevel ?? 0,
     englishWordsLearned: pet.englishWordsLearned ?? [],
+    lastTreated: pet.lastTreated ?? pet.lastFed ?? now,
+    lastChatted: pet.lastChatted ?? pet.born ?? now,
+    // Validate timestamps — protect against NaN from corrupted localStorage
+    lastUpdate: isValidDate(pet.lastUpdate) ? pet.lastUpdate : now,
+    lastFed: isValidDate(pet.lastFed) ? pet.lastFed : now,
+    lastPlayed: isValidDate(pet.lastPlayed) ? pet.lastPlayed : now,
+    lastSlept: isValidDate(pet.lastSlept) ? pet.lastSlept : now,
+    lastBathed: isValidDate(pet.lastBathed) ? pet.lastBathed : now,
   };
+}
+
+function isValidDate(s: string | undefined | null): boolean {
+  if (!s) return false;
+  const t = new Date(s).getTime();
+  return !isNaN(t) && t > 0;
 }

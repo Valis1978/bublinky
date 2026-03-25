@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getNextFoodToTry, FOOD_CATALOG } from '@/lib/food-catalog';
+import { getNextFoodToTry } from '@/lib/food-catalog';
+import { safeParseJSON } from '@/lib/safe-json';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-3-flash-preview';
@@ -85,7 +86,10 @@ Odpověz POUZE validním JSON:
       return NextResponse.json({ success: false, error: 'Empty response' }, { status: 502 });
     }
 
-    const story = JSON.parse(text);
+    const story = safeParseJSON<Record<string, unknown>>(text);
+    if (!story) {
+      return NextResponse.json({ success: false, error: 'Invalid AI response' }, { status: 502 });
+    }
 
     // Save to DB if petId provided
     if (petId) {

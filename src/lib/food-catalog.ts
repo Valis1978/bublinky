@@ -103,11 +103,21 @@ export function getNextFoodToTry(triedFoods: string[], bravery: number): FoodIte
     f.difficulty === targetDifficulty && !triedFoods.includes(f.id)
   );
 
-  // Fallback to easier if none available at target difficulty
+  // Fallback: go DOWN in difficulty first, then up — never suggest legendary to beginner
   if (candidates.length === 0) {
-    const fallback = FOOD_CATALOG.filter(f => !triedFoods.includes(f.id));
-    if (fallback.length === 0) return null;
-    return fallback[Math.floor(Math.random() * fallback.length)];
+    const difficulties: FoodDifficulty[] = ['easy', 'medium', 'hard', 'legendary'];
+    const targetIdx = difficulties.indexOf(targetDifficulty);
+    // Try easier first
+    for (let i = targetIdx - 1; i >= 0; i--) {
+      const lower = FOOD_CATALOG.filter(f => f.difficulty === difficulties[i] && !triedFoods.includes(f.id));
+      if (lower.length > 0) return lower[Math.floor(Math.random() * lower.length)];
+    }
+    // Then harder
+    for (let i = targetIdx + 1; i < difficulties.length; i++) {
+      const higher = FOOD_CATALOG.filter(f => f.difficulty === difficulties[i] && !triedFoods.includes(f.id));
+      if (higher.length > 0) return higher[Math.floor(Math.random() * higher.length)];
+    }
+    return null; // all tried
   }
 
   return candidates[Math.floor(Math.random() * candidates.length)];

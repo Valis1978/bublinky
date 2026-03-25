@@ -31,25 +31,25 @@ export function MessageBubble({ message, isMine }: MessageBubbleProps) {
             className="fixed inset-0 z-[100] bg-black/95 flex items-center justify-center"
             onClick={() => setFullscreen(false)}
           >
-            {/* Close button */}
-            <button
-              className="absolute top-4 right-4 p-2 rounded-full bg-white/10 text-white z-10"
-              onClick={() => setFullscreen(false)}
-            >
-              <X size={24} />
-            </button>
-
-            {/* Download button */}
-            <a
-              href={mediaUrl}
-              download
-              target="_blank"
-              rel="noopener noreferrer"
-              className="absolute top-4 left-4 p-2 rounded-full bg-white/10 text-white z-10"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <Download size={24} />
-            </a>
+            {/* Close + Download — safe area aware for iPhone notch/dynamic island */}
+            <div className="absolute top-0 left-0 right-0 z-10 flex justify-between p-4 safe-top">
+              <a
+                href={mediaUrl}
+                download
+                target="_blank"
+                rel="noopener noreferrer"
+                className="p-3 rounded-full bg-white/20 text-white backdrop-blur-sm"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <Download size={20} />
+              </a>
+              <button
+                className="p-3 rounded-full bg-white/20 text-white backdrop-blur-sm"
+                onClick={() => setFullscreen(false)}
+              >
+                <X size={20} />
+              </button>
+            </div>
 
             {message.type === 'video' ? (
               <video

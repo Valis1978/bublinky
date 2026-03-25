@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getFamilyContext } from '@/lib/custody-calendar';
+import { safeParseJSON } from '@/lib/safe-json';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-3-flash-preview';
@@ -221,7 +222,10 @@ Odpověz POUZE validním JSON:
       return NextResponse.json({ success: false, error: 'Empty AI response' }, { status: 502 });
     }
 
-    const reply = JSON.parse(text);
+    const reply = safeParseJSON<{ reply: string; emotion?: string; remember?: string; personalityShift?: unknown; english_assessment?: unknown }>(text);
+    if (!reply || !reply.reply) {
+      return NextResponse.json({ success: false, error: 'Invalid AI response format' }, { status: 502 });
+    }
 
     // Save to Supabase (async, don't block response)
     if (petId) {
@@ -242,32 +246,32 @@ Odpověz POUZE validním JSON:
       }
 
       // Update english level if AI assessed it
-      if (reply.english_assessment) {
-        const ea = reply.english_assessment;
+      if (reply.english_assessment && typeof reply.english_assessment === 'object') {
+        const ea = reply.english_assessment as { level_change?: number; word_learned?: string };
         const updates: Record<string, unknown> = {};
 
-        if (ea.level_change && ea.level_change !== 0) {
+        if (typeof ea.level_change === 'number' && ea.level_change !== 0) {
           const newLevel = Math.min(100, Math.max(0, (englishLevel || 0) + ea.level_change));
           updates.english_level = newLevel;
         }
 
-        if (ea.word_learned) {
+        if (typeof ea.word_learned === 'string' && ea.word_learned) {
           const words = [...(englishWordsLearned || [])];
           if (!words.includes(ea.word_learned)) {
             words.push(ea.word_learned);
             updates.english_words_learned = words;
           }
-          // Also save as memory
           supabase.from('bub_pet_memories').insert({
             pet_id: petId,
             category: 'preference',
             content: `Viki zná anglické slovo: "${ea.word_learned}"`,
             importance: 5,
-          }).then(() => {});
+          }).then(({ error }) => { if (error) console.error('Memory save failed:', error); });
         }
 
         if (Object.keys(updates).length > 0) {
-          supabase.from('bub_pets').update(updates).eq('id', petId).then(() => {});
+          supabase.from('bub_pets').update(updates).eq('id', petId)
+            .then(({ error }) => { if (error) console.error('English update failed:', error); });
         }
       }
     }
