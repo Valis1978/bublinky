@@ -81,7 +81,7 @@ export default function PetPage() {
       savePet(updated);
       setView('main');
 
-      // Async sync to Supabase
+      // Sync with Supabase — server is source of truth
       let userId: string | null = null;
       try {
         const raw = typeof window !== 'undefined' ? localStorage.getItem('bub_user') : null;
@@ -89,19 +89,32 @@ export default function PetPage() {
       } catch { /* corrupted localStorage */ }
       if (userId) {
         const id = userId;
+        // Try to load from server first
         fetch(`/api/pet?userId=${id}`)
           .then(r => r.json())
-          .then(data => { if (data.success) setPetId(data.pet.id); })
-          .catch(() => {});
-
-        // Upsert to DB
-        fetch('/api/pet', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId: id, pet: updated }),
-        })
-          .then(r => r.json())
-          .then(data => { if (data.success && data.petId) setPetId(data.petId); })
+          .then(data => {
+            if (data.success && data.pet) {
+              setPetId(data.pet.id);
+              // Server pet is newer? Use it
+              const serverUpdate = new Date(data.pet.lastUpdate).getTime();
+              const localUpdate = new Date(updated.lastUpdate).getTime();
+              if (serverUpdate > localUpdate) {
+                const serverPet = applyDecay(data.pet);
+                setPet(serverPet);
+                savePet(serverPet);
+              }
+            } else {
+              // No pet on server — push local pet
+              fetch('/api/pet', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ userId: id, pet: updated }),
+              })
+                .then(r => r.json())
+                .then(d => { if (d.success && d.petId) setPetId(d.petId); })
+                .catch(() => {});
+            }
+          })
           .catch(() => {});
       }
     } else {

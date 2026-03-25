@@ -25,7 +25,51 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: false, error: 'Pet not found' }, { status: 404 });
     }
 
-    return NextResponse.json({ success: true, pet: data });
+    // Map snake_case DB → camelCase PetState
+    const pet = {
+      id: data.id,
+      name: data.name,
+      species: data.species,
+      born: data.born,
+      hunger: data.hunger,
+      happiness: data.happiness,
+      energy: data.energy,
+      cleanliness: data.cleanliness,
+      xp: data.xp,
+      level: data.level,
+      stage: data.stage,
+      coins: data.coins,
+      skills: {
+        strength: data.skill_strength,
+        wisdom: data.skill_wisdom,
+        charisma: data.skill_charisma,
+        creativity: data.skill_creativity,
+        nature: data.skill_nature,
+      },
+      evolutionPath: data.evolution_path,
+      lastUpdate: data.last_update,
+      lastFed: data.last_fed,
+      lastPlayed: data.last_played,
+      lastSlept: data.last_slept,
+      lastBathed: data.last_bathed,
+      lastTreated: data.last_treated,
+      lastChatted: data.last_chatted,
+      isAlive: true,
+      isSleeping: data.is_sleeping,
+      isOnVacation: data.is_on_vacation,
+      vacationReturn: data.vacation_return,
+      mood: data.mood,
+      accessories: data.accessories || [],
+      activeOutfit: data.active_outfit || {},
+      personalityTraits: data.personality_traits || {},
+      foodBravery: data.food_bravery,
+      foodsTried: data.foods_tried || [],
+      favoriteFoods: data.favorite_foods || [],
+      englishLevel: data.english_level || 0,
+      englishWordsLearned: data.english_words_learned || [],
+    };
+
+    return NextResponse.json({ success: true, pet });
   } catch (err) {
     return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
   }
