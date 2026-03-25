@@ -35,7 +35,7 @@ export function PetTabBar({ active, onChange, unreadChat, activeQuests }: PetTab
           <button
             key={tab.id}
             onClick={() => onChange(tab.id)}
-            className="flex flex-col items-center gap-0.5 py-1.5 px-3 rounded-xl relative transition-all"
+            className="flex flex-col items-center gap-0.5 py-2.5 px-3 rounded-xl relative transition-all"
             style={{
               color: isActive ? 'var(--accent)' : 'var(--text-muted)',
               background: isActive ? 'var(--accent-soft)' : 'transparent',
@@ -47,14 +47,14 @@ export function PetTabBar({ active, onChange, unreadChat, activeQuests }: PetTab
                 <motion.span
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
-                  className="absolute -top-1.5 -right-2 w-4 h-4 rounded-full text-[9px] font-bold flex items-center justify-center text-white"
+                  className="absolute -top-1.5 -right-2 w-4 h-4 rounded-full text-[11px] font-bold flex items-center justify-center text-white"
                   style={{ background: '#EF4444' }}
                 >
                   {badge > 9 ? '9+' : badge}
                 </motion.span>
               )}
             </div>
-            <span className="text-[9px] font-medium">{tab.label}</span>
+            <span className="text-[11px] font-medium">{tab.label}</span>
           </button>
         );
       })}

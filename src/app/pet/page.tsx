@@ -15,7 +15,7 @@ import {
 } from '@/lib/pet-engine';
 import { PetTabBar, type PetTab } from '@/components/pet/PetTabBar';
 import { SpeechBubble } from '@/components/pet/SpeechBubble';
-import { PetChatPanel } from '@/components/pet/PetChatPanel';
+import { PetChatPanel, type ChatMessage } from '@/components/pet/PetChatPanel';
 import { SkillTree } from '@/components/pet/SkillTree';
 import {
   getRoutinesByTime, getCurrentTimeOfDay, getCompletedRoutines,
@@ -39,8 +39,8 @@ function StatBar({ icon, label, value, color }: { icon: React.ReactNode; label: 
       <div className="w-5 flex-shrink-0 flex justify-center">{icon}</div>
       <div className="flex-1">
         <div className="flex justify-between mb-0.5">
-          <span className="text-[10px] font-medium" style={{ color: 'var(--text-muted)' }}>{label}</span>
-          <span className="text-[10px] font-bold" style={{ color }}>{Math.round(value)}%</span>
+          <span className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>{label}</span>
+          <span className="text-[11px] font-bold" style={{ color }}>{Math.round(value)}%</span>
         </div>
         <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--bg-secondary)' }}>
           <motion.div
@@ -70,6 +70,7 @@ export default function PetPage() {
   const [showProactive, setShowProactive] = useState(false);
   const [bounceKey, setBounceKey] = useState(0);
   const [loaded, setLoaded] = useState(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
 
   // Load pet + sync with Supabase
   useEffect(() => {
@@ -81,9 +82,13 @@ export default function PetPage() {
       setView('main');
 
       // Async sync to Supabase
-      const user = typeof window !== 'undefined' ? localStorage.getItem('bub_user') : null;
-      if (user) {
-        const { id } = JSON.parse(user);
+      let userId: string | null = null;
+      try {
+        const raw = typeof window !== 'undefined' ? localStorage.getItem('bub_user') : null;
+        if (raw) userId = JSON.parse(raw)?.id;
+      } catch { /* corrupted localStorage */ }
+      if (userId) {
+        const id = userId;
         fetch(`/api/pet?userId=${id}`)
           .then(r => r.json())
           .then(data => { if (data.success) setPetId(data.pet.id); })
@@ -156,9 +161,13 @@ export default function PetPage() {
     setView('main');
 
     // Save to Supabase
-    const user = typeof window !== 'undefined' ? localStorage.getItem('bub_user') : null;
-    if (user) {
-      const { id } = JSON.parse(user);
+    let createUserId: string | null = null;
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem('bub_user') : null;
+      if (raw) createUserId = JSON.parse(raw)?.id;
+    } catch { /* ignore */ }
+    if (createUserId) {
+      const id = createUserId;
       fetch('/api/pet', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -271,7 +280,7 @@ export default function PetPage() {
           <span className="text-lg">{moodEmoji}</span>
           <div>
             <h1 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{pet.name}</h1>
-            <p className="text-[9px]" style={{ color: 'var(--text-muted)' }}>
+            <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
               Lvl {pet.level} • {stageName} • {daysOld}d
               {dominantSkill ? ` • ${dominantSkill.name}` : ''}
             </p>
@@ -295,7 +304,7 @@ export default function PetPage() {
               <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-0.5 rounded-full"
                 style={{ background: 'var(--bg-secondary)' }}>
                 <span className="text-xs">{moodEmoji}</span>
-                <span className="text-[9px] font-medium" style={{ color: 'var(--text-muted)' }}>{moodLabel}</span>
+                <span className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>{moodLabel}</span>
               </div>
 
               {/* Proactive speech bubble */}
@@ -322,10 +331,10 @@ export default function PetPage() {
               {/* Level progress */}
               <div className="w-40 mt-3">
                 <div className="flex justify-between mb-0.5">
-                  <span className="text-[9px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                  <span className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
                     <Star className="w-3 h-3 inline" /> Lvl {pet.level}
                   </span>
-                  <span className="text-[9px]" style={{ color: 'var(--text-muted)' }}>
+                  <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
                     {progress.current}/{progress.needed} XP
                   </span>
                 </div>
@@ -362,7 +371,7 @@ export default function PetPage() {
                   style={{ background: 'var(--bg-card)', boxShadow: 'var(--shadow)' }}
                 >
                   <div style={{ color: 'var(--accent)' }}>{icon}</div>
-                  <span className="text-[9px] font-medium" style={{ color: 'var(--text-muted)' }}>{label}</span>
+                  <span className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>{label}</span>
                 </motion.button>
               ))}
             </div>
@@ -370,7 +379,7 @@ export default function PetPage() {
         )}
 
         {tab === 'chat' && (
-          <PetChatPanel pet={pet} petId={petId} />
+          <PetChatPanel pet={pet} petId={petId} messages={chatMessages} setMessages={setChatMessages} />
         )}
 
         {tab === 'quests' && (
@@ -425,8 +434,6 @@ function QuestsPanel({ pet, onXpGain }: { pet: PetState; onXpGain: (xp: number) 
   }, []);
 
   const timeOfDay = getCurrentTimeOfDay();
-  const timeLabel = timeOfDay === 'morning' ? '🌅 Ráno' : timeOfDay === 'afternoon' ? '☀️ Odpoledne' : '🌙 Večer';
-  const routines = getRoutinesByTime(timeOfDay);
   const allRoutines = [
     { time: 'morning' as const, label: '🌅 Ráno', routines: getRoutinesByTime('morning') },
     { time: 'afternoon' as const, label: '☀️ Odpoledne', routines: getRoutinesByTime('afternoon') },
@@ -452,12 +459,12 @@ function QuestsPanel({ pet, onXpGain }: { pet: PetState; onXpGain: (xp: number) 
         <div className="flex items-center justify-center gap-4">
           <div>
             <p className="text-2xl font-black" style={{ color: 'var(--accent)' }}>{totalToday}</p>
-            <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Dnes splněno</p>
+            <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Dnes splněno</p>
           </div>
           {streak > 0 && (
             <div>
               <p className="text-2xl font-black" style={{ color: '#F59E0B' }}>🔥 {streak}</p>
-              <p className="text-[10px]" style={{ color: 'var(--text-muted)' }}>Dní v řadě</p>
+              <p className="text-[11px]" style={{ color: 'var(--text-muted)' }}>Dní v řadě</p>
             </div>
           )}
         </div>
@@ -474,7 +481,7 @@ function QuestsPanel({ pet, onXpGain }: { pet: PetState; onXpGain: (xp: number) 
           <h3 className="text-xs font-bold mb-2 flex items-center gap-1"
             style={{ color: section.time === timeOfDay ? 'var(--accent)' : 'var(--text-muted)' }}>
             {section.label}
-            {section.time === timeOfDay && <span className="text-[9px] px-1.5 py-0.5 rounded-full" style={{ background: 'var(--accent-soft)' }}>teď</span>}
+            {section.time === timeOfDay && <span className="text-[11px] px-1.5 py-0.5 rounded-full" style={{ background: 'var(--accent-soft)' }}>teď</span>}
           </h3>
           <div className="space-y-2">
             {section.routines.map(routine => {
@@ -505,12 +512,12 @@ function QuestsPanel({ pet, onXpGain }: { pet: PetState; onXpGain: (xp: number) 
                       style={{ color: 'var(--text-primary)' }}>
                       {routine.label}
                     </p>
-                    <p className="text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>
+                    <p className="text-[11px] truncate" style={{ color: 'var(--text-muted)' }}>
                       {isDone ? '🐾 Hotovo!' : routine.petMessage}
                     </p>
                   </div>
                   {!isDone && (
-                    <span className="text-[9px] font-bold flex-shrink-0" style={{ color: 'var(--accent)' }}>
+                    <span className="text-[11px] font-bold flex-shrink-0" style={{ color: 'var(--accent)' }}>
                       +{routine.xpReward} XP
                     </span>
                   )}

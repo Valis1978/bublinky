@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Send } from 'lucide-react';
 import type { PetState } from '@/lib/pet-engine';
 
-interface ChatMessage {
+export interface ChatMessage {
   id: string;
   role: 'user' | 'pet';
   content: string;
@@ -16,10 +16,11 @@ interface ChatMessage {
 interface PetChatPanelProps {
   pet: PetState;
   petId?: string;
+  messages: ChatMessage[];
+  setMessages: React.Dispatch<React.SetStateAction<ChatMessage[]>>;
 }
 
-export function PetChatPanel({ pet, petId }: PetChatPanelProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+export function PetChatPanel({ pet, petId, messages, setMessages }: PetChatPanelProps) {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -32,22 +33,24 @@ export function PetChatPanel({ pet, petId }: PetChatPanelProps) {
     }
   }, [messages]);
 
-  // Initial greeting
+  // Initial greeting — only if no messages yet
   useEffect(() => {
-    const greetings = [
-      `Ahoj Viki! 🐾 Jak se máš?`,
-      `Hej! Stýskalo se mi! ❤️`,
-      `Jupí, jsi tady! 🎉`,
-      `Čau Viki! Co je novýho? 😊`,
-    ];
-    setMessages([{
-      id: 'greeting',
-      role: 'pet',
-      content: greetings[Math.floor(Math.random() * greetings.length)],
-      emotion: 'happy',
-      timestamp: new Date(),
-    }]);
-  }, []);
+    if (messages.length === 0) {
+      const greetings = [
+        `Ahoj! 🐾 Jak se máš?`,
+        `Hej! Stýskalo se mi! ❤️`,
+        `Jupí, jsi tady! 🎉`,
+        `Čau! Co je novýho? 😊`,
+      ];
+      setMessages([{
+        id: 'greeting',
+        role: 'pet',
+        content: greetings[Math.floor(Math.random() * greetings.length)],
+        emotion: 'happy',
+        timestamp: new Date(),
+      }]);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const sendMessage = async () => {
     const text = input.trim();
@@ -188,10 +191,11 @@ export function PetChatPanel({ pet, petId }: PetChatPanelProps) {
           whileTap={{ scale: 0.9 }}
           onClick={sendMessage}
           disabled={!input.trim() || loading}
-          className="w-10 h-10 rounded-full flex items-center justify-center disabled:opacity-30"
+          className="w-12 h-12 rounded-full flex items-center justify-center disabled:opacity-30"
           style={{ background: 'var(--accent)', color: 'white' }}
+          aria-label="Odeslat zprávu"
         >
-          <Send size={16} />
+          <Send size={18} />
         </motion.button>
       </div>
     </div>

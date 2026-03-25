@@ -83,7 +83,7 @@ export function SkillTree({ skills, evolutionPath }: SkillTreeProps) {
                       {skill.emoji}
                     </div>
                     <span
-                      className="text-[8px] text-center leading-tight"
+                      className="text-[11px] text-center leading-tight"
                       style={{ color: skill.unlocked ? 'var(--text-primary)' : 'var(--text-muted)' }}
                     >
                       {skill.name}
@@ -94,7 +94,7 @@ export function SkillTree({ skills, evolutionPath }: SkillTreeProps) {
 
               {/* Unlock hint */}
               {unlockedCount < 5 && (
-                <p className="text-[9px] mt-1.5" style={{ color: 'var(--text-muted)' }}>
+                <p className="text-[11px] mt-1.5" style={{ color: 'var(--text-muted)' }}>
                   Další: {branchSkills.find(s => !s.unlocked)?.name} ({branchSkills.find(s => !s.unlocked)?.threshold} bodů)
                 </p>
               )}
