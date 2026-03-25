@@ -47,5 +47,11 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Bublinky potřebuje polohu pro zobrazení počasí ve tvém městě</string>
+	<key>NSCameraUsageDescription</key>
+	<string>Bublinky potřebuje fotoaparát pro sdílení fotek v chatu</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Bublinky potřebuje přístup k fotkám pro sdílení v chatu</string>
 </dict>
 </plist>
