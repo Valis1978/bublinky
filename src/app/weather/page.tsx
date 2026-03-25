@@ -144,6 +144,8 @@ export default function WeatherPage() {
         setAdviceLoading(true);
         try {
           const forecastStr = forecastDays.map(d => `${d.day}: ${d.tempMax}°/${d.tempMin}° ${d.description}`).join(', ');
+          const controller = new AbortController();
+          const timeout = setTimeout(() => controller.abort(), 15000);
           const advRes = await fetch('/api/weather/advice', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -156,10 +158,16 @@ export default function WeatherPage() {
               city: w.city,
               forecast: forecastStr,
             }),
+            signal: controller.signal,
           });
+          clearTimeout(timeout);
           const advData = await advRes.json();
+          console.log('[Weather] AI advice response:', advData);
           if (advData.success) setAdvice(advData.advice);
-        } catch { /* AI advice is optional */ }
+          else console.warn('[Weather] AI advice error:', advData.error);
+        } catch (advErr) {
+          console.warn('[Weather] AI advice fetch failed:', advErr);
+        }
         setAdviceLoading(false);
       } catch (err) {
         setError('Nepodařilo se načíst počasí 😢');
