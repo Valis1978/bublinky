@@ -1,47 +1,42 @@
 'use client';
 
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 
 type Theme = 'viki' | 'tata';
 
-interface ThemeContextType {
+interface ThemeContextValue {
   theme: Theme;
   setTheme: (theme: Theme) => void;
 }
 
-const ThemeContext = createContext<ThemeContextType>({
-  theme: 'viki',
-  setTheme: () => {},
-});
+const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
-export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setTheme] = useState<Theme>('viki');
-
-  useEffect(() => {
+function detectInitialTheme(): Theme {
+  if (typeof window === 'undefined') return 'viki';
+  try {
     const stored = localStorage.getItem('bub_user');
-    if (stored) {
-      try {
-        const user = JSON.parse(stored);
-        const t = user.role === 'parent' ? 'tata' : 'viki';
-        setTheme(t);
-        document.documentElement.setAttribute('data-theme', t);
-      } catch {
-        // ignore
-      }
-    }
-  }, []);
+    if (!stored) return 'viki';
+    const user = JSON.parse(stored);
+    return user.role === 'parent' ? 'tata' : 'viki';
+  } catch {
+    return 'viki';
+  }
+}
+
+export function ThemeProvider({ children }: { children: React.ReactNode }) {
+  const [theme, setTheme] = useState<Theme>(() => detectInitialTheme());
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
   }, [theme]);
 
-  return (
-    <ThemeContext.Provider value={{ theme, setTheme }}>
-      {children}
-    </ThemeContext.Provider>
-  );
+  const value = useMemo(() => ({ theme, setTheme }), [theme]);
+
+  return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
 export function useTheme() {
-  return useContext(ThemeContext);
+  const context = useContext(ThemeContext);
+  if (!context) throw new Error('useTheme must be used within ThemeProvider');
+  return context;
 }

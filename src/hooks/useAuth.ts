@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import type { UserRole } from '@/types/database';
 
 interface AuthUser {
@@ -11,22 +11,20 @@ interface AuthUser {
   avatar_url: string | null;
 }
 
-export function useAuth() {
-  const [user, setUser] = useState<AuthUser | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    // Read user from localStorage (set after login)
+function loadStoredUser(): AuthUser | null {
+  if (typeof window === 'undefined') return null;
+  try {
     const stored = localStorage.getItem('bub_user');
-    if (stored) {
-      try {
-        setUser(JSON.parse(stored));
-      } catch {
-        localStorage.removeItem('bub_user');
-      }
-    }
-    setLoading(false);
-  }, []);
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    localStorage.removeItem('bub_user');
+    return null;
+  }
+}
+
+export function useAuth() {
+  const [user, setUser] = useState<AuthUser | null>(() => loadStoredUser());
+  const [loading] = useState(false);
 
   const login = useCallback(
     async (pin: string, role: UserRole): Promise<{ success: boolean; error?: string }> => {

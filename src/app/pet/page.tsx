@@ -56,10 +56,31 @@ function StatBar({ icon, label, value, color }: { icon: React.ReactNode; label: 
   );
 }
 
+// Persist last 20 chat messages
+const CHAT_STORAGE_KEY = 'bub_pet_chat';
+const MAX_CHAT_MESSAGES = 20;
+
+function loadChatMessages(): ChatMessage[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(CHAT_STORAGE_KEY);
+    return raw ? JSON.parse(raw).slice(-MAX_CHAT_MESSAGES) : [];
+  } catch { return []; }
+}
+
+function saveChatMessages(msgs: ChatMessage[]) {
+  try {
+    localStorage.setItem(CHAT_STORAGE_KEY, JSON.stringify(msgs.slice(-MAX_CHAT_MESSAGES)));
+  } catch { /* full storage */ }
+}
+
 export default function PetPage() {
-  const [pet, setPet] = useState<PetState | null>(null);
+  const [pet, setPet] = useState<PetState | null>(() => {
+    const saved = loadPet();
+    return saved ? applyDecay(saved) : null;
+  });
   const [petId, setPetId] = useState<string | undefined>();
-  const [view, setView] = useState<View>('main');
+  const [view, setView] = useState<View>(() => loadPet() ? 'main' : 'setup');
   const [tab, setTab] = useState<PetTab>('home');
   const [selectedSpecies, setSelectedSpecies] = useState<PetSpecies>('cat');
   const [petName, setPetName] = useState('');
@@ -69,59 +90,52 @@ export default function PetPage() {
   const [proactiveEmotion, setProactiveEmotion] = useState('');
   const [showProactive, setShowProactive] = useState(false);
   const [bounceKey, setBounceKey] = useState(0);
-  const [loaded, setLoaded] = useState(false);
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [loaded] = useState(true);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => loadChatMessages());
 
-  // Load pet + sync with Supabase
+  // Persist chat messages when they change
   useEffect(() => {
-    const saved = loadPet();
-    if (saved) {
-      const updated = applyDecay(saved);
-      setPet(updated);
-      savePet(updated);
-      setView('main');
+    if (chatMessages.length > 0) saveChatMessages(chatMessages);
+  }, [chatMessages]);
 
-      // Sync with Supabase — server is source of truth
-      let userId: string | null = null;
-      try {
-        const raw = typeof window !== 'undefined' ? localStorage.getItem('bub_user') : null;
-        if (raw) userId = JSON.parse(raw)?.id;
-      } catch { /* corrupted localStorage */ }
-      if (userId) {
-        const id = userId;
-        // Try to load from server first
-        fetch(`/api/pet?userId=${id}`)
-          .then(r => r.json())
-          .then(data => {
-            if (data.success && data.pet) {
-              setPetId(data.pet.id);
-              // Server pet is newer? Use it
-              const serverUpdate = new Date(data.pet.lastUpdate).getTime();
-              const localUpdate = new Date(updated.lastUpdate).getTime();
-              if (serverUpdate > localUpdate) {
-                const serverPet = applyDecay(data.pet);
-                setPet(serverPet);
-                savePet(serverPet);
-              }
-            } else {
-              // No pet on server — push local pet
-              fetch('/api/pet', {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ userId: id, pet: updated }),
-              })
-                .then(r => r.json())
-                .then(d => { if (d.success && d.petId) setPetId(d.petId); })
-                .catch(() => {});
-            }
+  // Sync with Supabase on mount (pet already loaded via lazy init)
+  useEffect(() => {
+    if (!pet) return;
+    savePet(pet);
+
+    let userId: string | null = null;
+    try {
+      const raw = typeof window !== 'undefined' ? localStorage.getItem('bub_user') : null;
+      if (raw) userId = JSON.parse(raw)?.id;
+    } catch { /* corrupted localStorage */ }
+    if (!userId) return;
+
+    const id = userId;
+    fetch(`/api/pet?userId=${id}`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.success && data.pet) {
+          setPetId(data.pet.id);
+          const serverUpdate = new Date(data.pet.lastUpdate).getTime();
+          const localUpdate = new Date(pet.lastUpdate).getTime();
+          if (serverUpdate > localUpdate) {
+            const serverPet = applyDecay(data.pet);
+            setPet(serverPet);
+            savePet(serverPet);
+          }
+        } else {
+          fetch('/api/pet', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: id, pet }),
           })
-          .catch(() => {});
-      }
-    } else {
-      setView('setup');
-    }
-    setLoaded(true);
-  }, []);
+            .then(r => r.json())
+            .then(d => { if (d.success && d.petId) setPetId(d.petId); })
+            .catch(() => {});
+        }
+      })
+      .catch(() => {});
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Auto-save + decay every minute
   useEffect(() => {

@@ -45,21 +45,16 @@ function formatDate(iso: string): string {
 }
 
 export default function DiaryPage() {
-  const [entries, setEntries] = useState<DiaryEntry[]>([]);
+  const [entries, setEntries] = useState<DiaryEntry[]>(() => loadEntries());
   const [editing, setEditing] = useState<DiaryEntry | null>(null);
   const [showNew, setShowNew] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [loaded] = useState(true);
 
   // New entry state
   const [mood, setMood] = useState('😊');
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [stickers, setStickers] = useState<string[]>([]);
-
-  useEffect(() => {
-    setEntries(loadEntries());
-    setLoaded(true);
-  }, []);
 
   const saveEntry = () => {
     if (!content.trim()) return;

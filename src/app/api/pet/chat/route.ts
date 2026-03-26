@@ -5,6 +5,22 @@ import { safeParseJSON } from '@/lib/safe-json';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-3-flash-preview';
+const REQUEST_TIMEOUT_MS = 12000;
+
+const SPECIES_SOUNDS: Record<string, string> = {
+  cat: 'Mňau', dog: 'Haf', bunny: 'Hop hop', dragon: 'Frrr', unicorn: 'Iháá', fox: 'Yip',
+};
+
+function fallbackPetReply(species: string, petName: string) {
+  const sound = SPECIES_SOUNDS[species] || 'Ahoj';
+  return {
+    reply: `${sound}! Jsem tady, ${petName} jen přemýšlí... 🐾`,
+    emotion: 'sleepy',
+    remember: null,
+    personalityShift: null,
+    english_assessment: null,
+  };
+}
 
 function getSupabaseAdmin() {
   return createClient(
@@ -204,6 +220,9 @@ Odpověz POUZE validním JSON:
   "english_assessment": null nebo {"level_change": 1 nebo -1 nebo 0, "word_learned": "slovo které Viki prokázala že zná" nebo null, "reason": "proč si myslíš že se level změnil"}
 }`;
 
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
     const res = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GOOGLE_API_KEY}`,
       {
@@ -217,17 +236,20 @@ Odpověz POUZE validním JSON:
             responseMimeType: 'application/json',
           },
         }),
+        signal: controller.signal,
       }
-    );
+    ).finally(() => clearTimeout(timeout));
 
     if (!res.ok) {
-      return NextResponse.json({ success: false, error: `Gemini error: ${res.status}` }, { status: 502 });
+      const fb = fallbackPetReply(species, petName);
+      return NextResponse.json({ success: true, ...fb });
     }
 
     const data = await res.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
     if (!text) {
-      return NextResponse.json({ success: false, error: 'Empty AI response' }, { status: 502 });
+      const fb = fallbackPetReply(species, petName);
+      return NextResponse.json({ success: true, ...fb });
     }
 
     const reply = safeParseJSON<{ reply: string; emotion?: string; remember?: string; personalityShift?: unknown; english_assessment?: unknown }>(text);
@@ -286,6 +308,8 @@ Odpověz POUZE validním JSON:
 
     return NextResponse.json({ success: true, ...reply });
   } catch (err) {
-    return NextResponse.json({ success: false, error: String(err) }, { status: 500 });
+    console.error('[Pet Chat Error]', err);
+    const fb = fallbackPetReply('cat', 'Mazlíčku');
+    return NextResponse.json({ success: true, ...fb });
   }
 }
