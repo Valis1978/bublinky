@@ -2,6 +2,7 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { usePathname } from 'next/navigation';
+import { bumpCounter } from '@/lib/sticker-awards';
 
 /**
  * Activity tracker hook — logs user activity to the server
@@ -75,6 +76,10 @@ export function useActivityTracker() {
           duration_sec: duration,
         });
       }
+      // Sticker album counters: a real session on a game / learn page counts
+      const prev = lastPageRef.current;
+      if (prev.startsWith('/games/') && duration >= 20) bumpCounter('games');
+      if (prev.startsWith('/learn/') && duration >= 60) bumpCounter('quizzes');
     }
 
     lastPageRef.current = pathname;
