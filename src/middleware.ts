@@ -11,6 +11,7 @@ export async function middleware(request: NextRequest) {
     PUBLIC_PATHS.some((p) => pathname.startsWith(p)) ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/icons') ||
+    pathname.startsWith('/stickers') ||
     pathname === '/manifest.json' ||
     pathname === '/sw.js' ||
     pathname === '/favicon.ico'
