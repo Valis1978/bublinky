@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { chatService } from '@/services/chat.service';
+import { chatService, REACTION_EMOJIS } from '@/services/chat.service';
 import { createClient } from '@supabase/supabase-js';
 import type { MessageType } from '@/types/database';
 
@@ -102,6 +102,61 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({ success: true, data });
+  } catch {
+    return NextResponse.json({ success: false, error: 'Invalid request' }, { status: 400 });
+  }
+}
+
+export async function PATCH(request: NextRequest) {
+  // Authoritative identity — set by middleware from a verified session cookie,
+  // never trust a client-supplied userId over this for the actual mutation.
+  const authenticatedUserId = request.headers.get('x-user-id');
+  if (!authenticatedUserId) {
+    return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+  }
+
+  try {
+    const body = await request.json();
+    const { messageId, emoji, userId } = body as {
+      messageId?: string;
+      emoji?: string;
+      userId?: string;
+    };
+
+    if (!messageId || typeof messageId !== 'string') {
+      return NextResponse.json({ success: false, error: 'messageId is required' }, { status: 400 });
+    }
+
+    if (
+      !emoji ||
+      typeof emoji !== 'string' ||
+      emoji.length > 8 ||
+      !REACTION_EMOJIS.includes(emoji)
+    ) {
+      return NextResponse.json({ success: false, error: 'Invalid emoji' }, { status: 400 });
+    }
+
+    if (userId && userId !== authenticatedUserId) {
+      return NextResponse.json(
+        { success: false, error: "Cannot toggle another user's reaction" },
+        { status: 403 }
+      );
+    }
+
+    const { data, error } = await chatService.toggleReaction(messageId, emoji, authenticatedUserId);
+
+    if (error === 'Message not found') {
+      return NextResponse.json({ success: false, error }, { status: 404 });
+    }
+
+    if (error || !data) {
+      return NextResponse.json(
+        { success: false, error: error || 'Reaction toggle failed' },
+        { status: 500 }
+      );
+    }
+
+    return NextResponse.json({ success: true, reactions: data });
   } catch {
     return NextResponse.json({ success: false, error: 'Invalid request' }, { status: 400 });
   }

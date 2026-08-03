@@ -1,15 +1,18 @@
 'use client';
 
 import { useState, useRef, type FormEvent } from 'react';
-import { motion } from 'framer-motion';
-import { Send, Image as ImageIcon, Video, Mic } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Send, Image as ImageIcon, Video, Mic, Sticker as StickerIcon } from 'lucide-react';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
+import { loadPet } from '@/lib/pet-engine';
+import { stickerFile, STICKERS } from '@/lib/sticker-catalog';
 
 interface MessageInputProps {
   onSend: (content: string) => void;
   onPhoto?: (file: File) => void;
   onVideo?: (file: File) => void;
   onVoice?: (blob: Blob) => void;
+  onSticker?: (stickerId: string) => void;
   disabled?: boolean;
 }
 
@@ -19,8 +22,10 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export function MessageInput({ onSend, onPhoto, onVideo, onVoice, disabled }: MessageInputProps) {
+export function MessageInput({ onSend, onPhoto, onVideo, onVoice, onSticker, disabled }: MessageInputProps) {
   const [text, setText] = useState('');
+  const [stickerSheetOpen, setStickerSheetOpen] = useState(false);
+  const [ownedStickers, setOwnedStickers] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const { isRecording, duration, startRecording, stopRecording, cancelRecording } = useVoiceRecorder();
@@ -62,6 +67,17 @@ export function MessageInput({ onSend, onPhoto, onVideo, onVoice, disabled }: Me
     } else {
       await startRecording();
     }
+  };
+
+  const handleOpenStickerSheet = () => {
+    const pet = loadPet();
+    setOwnedStickers(pet?.stickers ?? []);
+    setStickerSheetOpen(true);
+  };
+
+  const handleStickerPick = (stickerId: string) => {
+    setStickerSheetOpen(false);
+    onSticker?.(stickerId);
   };
 
   const hasContent = text.trim().length > 0;
@@ -113,6 +129,70 @@ export function MessageInput({ onSend, onPhoto, onVideo, onVoice, disabled }: Me
   }
 
   return (
+    <>
+      {/* Sticker sheet — grid of collected stickers */}
+      <AnimatePresence>
+        {stickerSheetOpen && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-[55] bg-black/30"
+              onClick={() => setStickerSheetOpen(false)}
+            />
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ duration: 0.25, ease: 'easeOut' }}
+              className="fixed left-0 right-0 bottom-0 z-[60] rounded-t-3xl p-4 pb-6 safe-bottom max-h-[60vh] overflow-y-auto"
+              style={{ background: 'var(--bg-card)', boxShadow: 'var(--shadow-lg)' }}
+            >
+              <div className="w-10 h-1 rounded-full mx-auto mb-3" style={{ background: 'var(--border)' }} />
+              <h3 className="text-sm font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>
+                Samolepky
+              </h3>
+              {ownedStickers.length === 0 ? (
+                <p className="text-sm text-center py-6" style={{ color: 'var(--text-muted)' }}>
+                  Samolepky nasbíráš v albu a v dárečcích! 🎁
+                </p>
+              ) : (
+                <div className="grid grid-cols-4 gap-3 pb-2">
+                  {ownedStickers.map((id) => {
+                    const def = STICKERS[id];
+                    if (!def) return null;
+                    return (
+                      <button
+                        key={id}
+                        type="button"
+                        onClick={() => handleStickerPick(id)}
+                        className="flex flex-col items-center gap-1 p-2 rounded-2xl active:scale-95 transition-transform"
+                        style={{ background: 'var(--bg-secondary)' }}
+                      >
+                        <img
+                          src={stickerFile(id)}
+                          alt={def.name}
+                          width={56}
+                          height={56}
+                          style={{ aspectRatio: '1 / 1' }}
+                        />
+                        <span
+                          className="text-[10px] text-center leading-tight"
+                          style={{ color: 'var(--text-muted)' }}
+                        >
+                          {def.name}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
+
     <form
       onSubmit={handleSubmit}
       className="flex items-end gap-2 p-3 safe-bottom"
@@ -157,6 +237,16 @@ export function MessageInput({ onSend, onPhoto, onVideo, onVoice, disabled }: Me
         className="hidden"
       />
 
+      {/* Sticker button — opens the collected-stickers sheet */}
+      <button
+        type="button"
+        onClick={handleOpenStickerSheet}
+        className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-colors"
+        style={{ background: 'var(--accent-soft)', color: 'var(--accent)' }}
+      >
+        <StickerIcon size={20} />
+      </button>
+
       {/* Text input */}
       <div
         className="flex-1 rounded-3xl px-4 py-2.5 transition-all"
@@ -199,5 +289,6 @@ export function MessageInput({ onSend, onPhoto, onVideo, onVoice, disabled }: Me
         </motion.button>
       )}
     </form>
+    </>
   );
 }

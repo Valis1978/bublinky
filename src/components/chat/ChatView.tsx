@@ -7,6 +7,7 @@ import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { MessageBubble } from './MessageBubble';
 import { MessageInput } from './MessageInput';
 import { motion } from 'framer-motion';
+import { STICKERS, stickerFile } from '@/lib/sticker-catalog';
 
 export function ChatView() {
   const { user } = useAuth();
@@ -67,6 +68,13 @@ export function ChatView() {
     if (data.success && data.data?.url) {
       sendMessage(null as unknown as string, 'voice', data.data.url);
     }
+  };
+
+  const handleSticker = (stickerId: string) => {
+    const sticker = STICKERS[stickerId];
+    if (!sticker) return;
+    // 'sticker' isn't in useMessages' narrower type param yet — same cast-through pattern already used for 'video' below.
+    sendMessage(sticker.name, 'sticker' as unknown as 'text', stickerFile(stickerId));
   };
 
   const handleVideo = async (file: File) => {
@@ -161,6 +169,7 @@ export function ChatView() {
                   key={msg.id}
                   message={msg}
                   isMine={msg.sender_id === user?.id}
+                  currentUserId={user?.id}
                 />
               ))}
             </div>
@@ -174,7 +183,13 @@ export function ChatView() {
         className="fixed left-0 right-0 z-40"
         style={{ bottom: 'calc(4rem + env(safe-area-inset-bottom, 0px))' }}
       >
-        <MessageInput onSend={handleSend} onPhoto={handlePhoto} onVideo={handleVideo} onVoice={handleVoice} />
+        <MessageInput
+          onSend={handleSend}
+          onPhoto={handlePhoto}
+          onVideo={handleVideo}
+          onVoice={handleVoice}
+          onSticker={handleSticker}
+        />
       </div>
     </div>
   );

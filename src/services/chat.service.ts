@@ -5,6 +5,25 @@ function getClient() {
   return createAdminClient();
 }
 
+// ============================================================
+// Reactions + stickers — local type additions
+// The DB migration (bub_messages.reactions JSONB DEFAULT '{}',
+// type now allows 'sticker') is already applied. src/types/database.ts
+// itself is owned by a parallel task, so we widen locally here instead
+// of editing it, and reuse this shape from the chat components.
+// ============================================================
+
+/** { [emoji]: userId[] } */
+export type ChatReactions = Record<string, string[]>;
+
+export interface ChatMessage extends Omit<BubMessage, 'type'> {
+  type: MessageType | 'sticker';
+  reactions?: ChatReactions;
+}
+
+/** Single source of truth for allowed reaction emoji — shared by the picker UI and the API validation. */
+export const REACTION_EMOJIS: readonly string[] = ['❤️', '😂', '😮', '👍', '🎉', '🥰'];
+
 export const chatService = {
   async getMessages(
     limit = 50,
@@ -92,4 +111,70 @@ export const chatService = {
       .update({ last_seen_at: new Date().toISOString() })
       .eq('id', userId);
   },
+
+  /** Toggle userId in reactions[emoji] on a message; drops the emoji key when its list empties. */
+  async toggleReaction(
+    messageId: string,
+    emoji: string,
+    userId: string
+  ): Promise<{ data: ChatReactions | null; error?: string }> {
+    const supabase = getClient();
+
+    const { data: existing, error: fetchError } = await supabase
+      .from('bub_messages')
+      .select('reactions')
+      .eq('id', messageId)
+      .single();
+
+    if (fetchError || !existing) {
+      return { data: null, error: fetchError?.message || 'Message not found' };
+    }
+
+    const currentReactions = (existing as { reactions: ChatReactions | null }).reactions ?? {};
+    const holders = currentReactions[emoji] ?? [];
+    const nextHolders = holders.includes(userId)
+      ? holders.filter((id) => id !== userId)
+      : [...holders, userId];
+
+    const nextReactions: ChatReactions = { ...currentReactions };
+    if (nextHolders.length === 0) {
+      delete nextReactions[emoji];
+    } else {
+      nextReactions[emoji] = nextHolders;
+    }
+
+    const { data: updated, error: updateError } = await supabase
+      .from('bub_messages')
+      .update({ reactions: nextReactions })
+      .eq('id', messageId)
+      .select('reactions')
+      .single();
+
+    if (updateError || !updated) {
+      return { data: null, error: updateError?.message || 'Update failed' };
+    }
+
+    return { data: (updated as { reactions: ChatReactions | null }).reactions ?? {} };
+  },
 };
+
+/**
+ * Client-callable helper — hits the PATCH endpoint directly (no admin client involved),
+ * so it's safe to import from client components like MessageBubble.
+ */
+export async function toggleReaction(
+  messageId: string,
+  emoji: string,
+  userId: string
+): Promise<{ success: boolean; reactions?: ChatReactions; error?: string }> {
+  try {
+    const res = await fetch('/api/messages', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ messageId, emoji, userId }),
+    });
+    return await res.json();
+  } catch {
+    return { success: false, error: 'Network error' };
+  }
+}
