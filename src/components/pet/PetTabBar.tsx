@@ -1,9 +1,9 @@
 'use client';
 
 import { motion } from 'framer-motion';
-import { Home, MessageCircle, Star, Backpack, Sparkles } from 'lucide-react';
+import { Home, MessageCircle, Star, Backpack, Sparkles, ShoppingBag } from 'lucide-react';
 
-export type PetTab = 'home' | 'chat' | 'quests' | 'inventory' | 'skills';
+export type PetTab = 'home' | 'chat' | 'quests' | 'shop' | 'inventory' | 'skills';
 
 interface PetTabBarProps {
   active: PetTab;
@@ -16,6 +16,7 @@ const TABS: { id: PetTab; icon: typeof Home; label: string }[] = [
   { id: 'home', icon: Home, label: 'Domov' },
   { id: 'chat', icon: MessageCircle, label: 'Chat' },
   { id: 'quests', icon: Star, label: 'Questy' },
+  { id: 'shop', icon: ShoppingBag, label: 'Obchod' },
   { id: 'inventory', icon: Backpack, label: 'Batoh' },
   { id: 'skills', icon: Sparkles, label: 'Skilly' },
 ];

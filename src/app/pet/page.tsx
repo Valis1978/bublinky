@@ -2,21 +2,26 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { BottomNav } from '@/components/ui/BottomNav';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import {
   Heart, Zap, Droplets, Sparkles, Moon, Gamepad2,
   Cookie, ShowerHead, Star, Coins,
 } from 'lucide-react';
 import {
-  PetState, PetSpecies, PET_SPRITES, EVOLUTION_SPRITES,
-  createNewPet, loadPet, savePet, applyDecay, performAction,
-  calculateMood, getMoodEmoji, getMoodLabel, getLevelProgress,
+  PetState, PetSpecies, createNewPet, loadPet, savePet, applyDecay,
+  performAction, calculateMood, getMoodEmoji, getMoodLabel, getLevelProgress,
   getStageName, ACTIONS, getDominantSkill,
 } from '@/lib/pet-engine';
 import { PetTabBar, type PetTab } from '@/components/pet/PetTabBar';
 import { SpeechBubble } from '@/components/pet/SpeechBubble';
 import { PetChatPanel, type ChatMessage } from '@/components/pet/PetChatPanel';
 import { SkillTree } from '@/components/pet/SkillTree';
+import { PetAvatar, MiniPet } from '@/components/pet/avatar/PetAvatar';
+import { SPECIES } from '@/components/pet/avatar/species';
+import { PetRoom } from '@/components/pet/room/PetRoom';
+import { ShopPanel } from '@/components/pet/ShopPanel';
+import { BackpackPanel } from '@/components/pet/BackpackPanel';
+import { hapticTap, hapticBump, hapticWarn, hapticSuccess } from '@/lib/haptics';
 import {
   getRoutinesByTime, getCurrentTimeOfDay, getCompletedRoutines,
   completeRoutine, getRoutineStreak, type RoutineStep,
@@ -24,14 +29,7 @@ import {
 
 type View = 'setup' | 'main';
 
-const SPECIES_OPTIONS: { id: PetSpecies; emoji: string; name: string }[] = [
-  { id: 'cat', emoji: '🐱', name: 'Kočička' },
-  { id: 'dog', emoji: '🐶', name: 'Pejsek' },
-  { id: 'bunny', emoji: '🐰', name: 'Králíček' },
-  { id: 'dragon', emoji: '🐲', name: 'Dráček' },
-  { id: 'unicorn', emoji: '🦄', name: 'Jednorožec' },
-  { id: 'fox', emoji: '🦊', name: 'Lištička' },
-];
+const SPECIES_OPTIONS: PetSpecies[] = ['cat', 'dog', 'bunny', 'dragon', 'unicorn', 'fox'];
 
 function StatBar({ icon, label, value, color }: { icon: React.ReactNode; label: string; value: number; color: string }) {
   return (
@@ -90,7 +88,6 @@ export default function PetPage() {
   const [proactiveEmotion, setProactiveEmotion] = useState('');
   const [showProactive, setShowProactive] = useState(false);
   const [bounceKey, setBounceKey] = useState(0);
-  const [loaded] = useState(true);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => loadChatMessages());
 
   // Persist chat messages when they change
@@ -186,6 +183,7 @@ export default function PetPage() {
     setPet(newPet);
     savePet(newPet);
     setView('main');
+    void hapticSuccess();
 
     // Save to Supabase
     let createUserId: string | null = null;
@@ -213,6 +211,10 @@ export default function PetPage() {
       setPet(result.pet);
       savePet(result.pet);
       setBounceKey(k => k + 1);
+      if (result.message.includes('Evoluce')) void hapticSuccess();
+      else void hapticBump();
+    } else {
+      void hapticWarn();
     }
     setActionMessage(result.message);
     setShowMessage(true);
@@ -220,7 +222,22 @@ export default function PetPage() {
     setTimeout(() => setShowMessage(false), 2500);
   }, [pet]);
 
-  if (!loaded) return null;
+  /** Shop / backpack panels report back here — they never persist themselves. */
+  const handleEconomyUpdate = useCallback((result: { pet: PetState; message: string }) => {
+    const changed = result.pet !== pet;
+    if (changed) {
+      setPet(result.pet);
+      savePet(result.pet);
+      setBounceKey(k => k + 1);
+      void hapticBump();
+    } else {
+      void hapticWarn();
+    }
+    setActionMessage(result.message);
+    setShowMessage(true);
+    setShowProactive(false);
+    setTimeout(() => setShowMessage(false), 2500);
+  }, [pet]);
 
   // ═══════════════ SETUP SCREEN ═══════════════
   if (view === 'setup' || !pet) {
@@ -228,11 +245,14 @@ export default function PetPage() {
       <div className="flex flex-col h-dvh">
         <div className="flex-1 overflow-y-auto p-6 pb-nav safe-top">
           <div className="max-w-sm mx-auto space-y-8">
-            <div className="text-center space-y-2 pt-8">
-              <motion.div className="text-6xl"
-                animate={{ rotate: [0, -10, 10, -10, 0] }}
+            <div className="text-center space-y-2 pt-6">
+              <motion.div
+                animate={{ rotate: [0, -6, 6, -6, 0] }}
                 transition={{ duration: 2, repeat: Infinity, repeatDelay: 3 }}
-              >🥚</motion.div>
+                className="inline-block"
+              >
+                <PetAvatar species={selectedSpecies} stage="egg" mood="happy" size={110} still />
+              </motion.div>
               <h1 className="text-2xl font-bold" style={{ color: 'var(--text-primary)' }}>
                 Vyber si mazlíčka!
               </h1>
@@ -243,16 +263,18 @@ export default function PetPage() {
 
             <div className="grid grid-cols-3 gap-3">
               {SPECIES_OPTIONS.map(sp => (
-                <motion.button key={sp.id} whileTap={{ scale: 0.95 }}
-                  onClick={() => setSelectedSpecies(sp.id)}
-                  className="p-4 rounded-2xl flex flex-col items-center gap-2 transition-all"
+                <motion.button key={sp} whileTap={{ scale: 0.95 }}
+                  onClick={() => { setSelectedSpecies(sp); void hapticTap(); }}
+                  className="p-3 rounded-2xl flex flex-col items-center gap-1 transition-all"
                   style={{
-                    border: selectedSpecies === sp.id ? '2px solid var(--accent)' : '2px solid transparent',
-                    background: selectedSpecies === sp.id ? 'var(--accent-soft)' : 'var(--bg-card)',
+                    border: selectedSpecies === sp ? '2px solid var(--accent)' : '2px solid transparent',
+                    background: selectedSpecies === sp ? 'var(--accent-soft)' : 'var(--bg-card)',
                   }}
                 >
-                  <span className="text-3xl">{sp.emoji}</span>
-                  <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{sp.name}</span>
+                  <MiniPet species={sp} stage="child" mood="happy" size={62} />
+                  <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>
+                    {SPECIES[sp].name}
+                  </span>
                 </motion.button>
               ))}
             </div>
@@ -276,7 +298,7 @@ export default function PetPage() {
               className="w-full py-4 rounded-2xl text-white font-bold text-base disabled:opacity-30"
               style={{ background: 'var(--accent)' }}
             >
-              Adoptovat {SPECIES_OPTIONS.find(s => s.id === selectedSpecies)?.emoji} ❤️
+              Adoptovat ❤️
             </motion.button>
           </div>
         </div>
@@ -286,9 +308,6 @@ export default function PetPage() {
   }
 
   // ═══════════════ MAIN VIEW ═══════════════
-  const sprite = pet.evolutionPath && (pet.stage === 'adult' || pet.stage === 'legendary')
-    ? `${PET_SPRITES[pet.species as PetSpecies]?.[pet.stage] || '🐾'}${EVOLUTION_SPRITES[pet.evolutionPath]?.emoji || ''}`
-    : PET_SPRITES[pet.species as PetSpecies]?.[pet.stage] || '🐾';
   const mood = calculateMood(pet);
   const moodEmoji = getMoodEmoji(mood);
   const moodLabel = getMoodLabel(mood);
@@ -319,59 +338,62 @@ export default function PetPage() {
         </div>
       </div>
 
-      {/* Tab content — extra padding for PetTabBar (40px) + BottomNav (64px) */}
-      <div className="flex-1 overflow-hidden" style={{ paddingBottom: '120px' }}>
+      {/* Tab content — extra padding for PetTabBar + BottomNav */}
+      <div className="flex-1 overflow-hidden" style={{ paddingBottom: '130px' }}>
         {tab === 'home' && (
           <div className="h-full overflow-y-auto pb-2">
-            {/* Pet display area */}
-            <div className="relative flex flex-col items-center justify-center py-6 mx-4 mt-3 rounded-3xl"
-              style={{ background: 'var(--bg-card)', boxShadow: 'var(--shadow)', minHeight: 180 }}
+            {/* Pet in its room */}
+            <div className="relative mx-4 mt-3 rounded-3xl overflow-hidden"
+              style={{ boxShadow: 'var(--shadow-lg)', height: 'min(46vh, 380px)', minHeight: 280 }}
             >
+              <PetRoom placed={pet.room.placed} className="h-full">
+                <button
+                  onClick={() => { setBounceKey(k => k + 1); void hapticTap(); }}
+                  aria-label={`Pohladit ${pet.name}`}
+                  style={{ background: 'transparent', border: 'none', padding: 0 }}
+                >
+                  <PetAvatar
+                    species={pet.species as PetSpecies}
+                    stage={pet.stage}
+                    mood={mood}
+                    outfit={pet.activeOutfit}
+                    evolutionPath={pet.evolutionPath}
+                    size={175}
+                    bounceKey={bounceKey}
+                  />
+                </button>
+              </PetRoom>
+
               {/* Mood badge */}
               <div className="absolute top-2 right-2 flex items-center gap-1 px-2 py-0.5 rounded-full"
-                style={{ background: 'var(--bg-secondary)' }}>
+                style={{ background: 'var(--bg-nav)', backdropFilter: 'blur(8px)' }}>
                 <span className="text-xs">{moodEmoji}</span>
                 <span className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>{moodLabel}</span>
               </div>
 
-              {/* Proactive speech bubble */}
-              <SpeechBubble message={proactiveMsg} emotion={proactiveEmotion} visible={showProactive && !showMessage} />
+              {/* Speech bubbles over the scene */}
+              <div className="absolute top-3 left-0 right-0 flex justify-center px-6">
+                <SpeechBubble message={proactiveMsg} emotion={proactiveEmotion} visible={showProactive && !showMessage} />
+                <SpeechBubble message={actionMessage} visible={showMessage} />
+              </div>
+            </div>
 
-              {/* Action message */}
-              <SpeechBubble message={actionMessage} visible={showMessage} />
-
-              {/* Pet sprite */}
-              <motion.div key={bounceKey} className="text-6xl select-none"
-                animate={
-                  pet.isOnVacation ? { rotate: [0, 5, -5, 0], scale: [1, 0.9, 1] }
-                  : pet.isSleeping ? { y: [0, -3, 0], scale: [1, 1.02, 1] }
-                  : mood === 'ecstatic' ? { y: [0, -20, 0], rotate: [0, -5, 5, 0] }
-                  : mood === 'happy' ? { y: [0, -10, 0] }
-                  : mood === 'sad' || mood === 'hungry' ? { y: [0, 2, 0], scale: [1, 0.95, 1] }
-                  : { y: [0, -5, 0] }
-                }
-                transition={{ duration: pet.isSleeping ? 3 : 1.5, repeat: Infinity, repeatDelay: 1, ease: 'easeInOut' }}
-              >
-                {pet.isOnVacation ? '🏖️' : sprite}
-              </motion.div>
-
-              {/* Level progress */}
-              <div className="w-40 mt-3">
-                <div className="flex justify-between mb-0.5">
-                  <span className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
-                    <Star className="w-3 h-3 inline" /> Lvl {pet.level}
-                  </span>
-                  <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
-                    {progress.current}/{progress.needed} XP
-                  </span>
-                </div>
-                <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-secondary)' }}>
-                  <motion.div className="h-full rounded-full"
-                    style={{ background: 'linear-gradient(90deg, var(--accent), #F59E0B)' }}
-                    animate={{ width: `${progress.percent}%` }}
-                    transition={{ duration: 0.5 }}
-                  />
-                </div>
+            {/* Level progress */}
+            <div className="mx-4 mt-3 p-3 rounded-2xl" style={{ background: 'var(--bg-card)', boxShadow: 'var(--shadow)' }}>
+              <div className="flex justify-between mb-1">
+                <span className="text-[11px] font-medium" style={{ color: 'var(--text-muted)' }}>
+                  <Star className="w-3 h-3 inline" /> Level {pet.level}
+                </span>
+                <span className="text-[11px]" style={{ color: 'var(--text-muted)' }}>
+                  {progress.current}/{progress.needed} XP
+                </span>
+              </div>
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: 'var(--bg-secondary)' }}>
+                <motion.div className="h-full rounded-full"
+                  style={{ background: 'linear-gradient(90deg, var(--accent), #F59E0B)' }}
+                  animate={{ width: `${progress.percent}%` }}
+                  transition={{ duration: 0.5 }}
+                />
               </div>
             </div>
 
@@ -420,18 +442,15 @@ export default function PetPage() {
           }} />
         )}
 
+        {tab === 'shop' && (
+          <div className="h-full overflow-y-auto">
+            <ShopPanel pet={pet} onUpdate={handleEconomyUpdate} />
+          </div>
+        )}
+
         {tab === 'inventory' && (
-          <div className="h-full overflow-y-auto p-4">
-            <div className="text-center py-12 space-y-3">
-              <span className="text-5xl">🎒</span>
-              <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Batoh brzy!</h3>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
-                Tvoje předměty a obchůdek se chystají...
-              </p>
-              <div className="flex items-center justify-center gap-1 text-sm font-bold" style={{ color: '#F59E0B' }}>
-                <Coins size={14} /> {pet.coins} mincí
-              </div>
-            </div>
+          <div className="h-full overflow-y-auto">
+            <BackpackPanel pet={pet} onUpdate={handleEconomyUpdate} />
           </div>
         )}
 
@@ -443,7 +462,7 @@ export default function PetPage() {
       </div>
 
       {/* Both are fixed positioned */}
-      <PetTabBar active={tab} onChange={setTab} />
+      <PetTabBar active={tab} onChange={(t) => { setTab(t); void hapticTap(); }} />
       <BottomNav />
     </div>
   );
@@ -473,6 +492,7 @@ function QuestsPanel({ pet, onXpGain }: { pet: PetState; onXpGain: (xp: number) 
     setCompleted(updated);
     onXpGain(routine.xpReward);
     setCelebrateId(routine.id);
+    void hapticSuccess();
     setTimeout(() => setCelebrateId(null), 1500);
     setStreak(getRoutineStreak());
   };
