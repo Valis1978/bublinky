@@ -67,6 +67,11 @@ export async function GET(req: NextRequest) {
       favoriteFoods: data.favorite_foods || [],
       englishLevel: data.english_level || 0,
       englishWordsLearned: data.english_words_learned || [],
+      inventory: data.inventory || {},
+      stickers: data.stickers || [],
+      room: data.room && typeof data.room === 'object' && data.room.placed ? data.room : { placed: {} },
+      lastGiftClaim: data.last_gift_claim || null,
+      giftStreak: data.gift_streak || 0,
     };
 
     return NextResponse.json({ success: true, pet });
@@ -122,6 +127,11 @@ export async function PUT(req: NextRequest) {
       favorite_foods: pet.favoriteFoods || [],
       english_level: pet.englishLevel || 0,
       english_words_learned: pet.englishWordsLearned || [],
+      inventory: pet.inventory || {},
+      stickers: pet.stickers || [],
+      room: pet.room || { placed: {} },
+      last_gift_claim: pet.lastGiftClaim || null,
+      gift_streak: pet.giftStreak || 0,
       updated_at: new Date().toISOString(),
     };
 

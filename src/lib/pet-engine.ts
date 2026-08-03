@@ -64,6 +64,18 @@ export interface PetState {
   // English Learning
   englishLevel: number; // 0-100 (0=unknown, 10=beginner, 50=intermediate, 100=advanced)
   englishWordsLearned: string[]; // words/phrases Viki demonstrated knowledge of
+
+  // Economy V2 (shop / inventory / stickers / room / daily gift)
+  inventory: Record<string, number>; // itemId → owned count
+  stickers: string[];                // collected sticker ids
+  room: RoomState;
+  lastGiftClaim: string | null;      // ISO timestamp of last daily gift
+  giftStreak: number;                // consecutive days with a claimed gift
+}
+
+export interface RoomState {
+  /** decoration slot → placed item id (see PetRoom for slot ids) */
+  placed: Record<string, string | null>;
 }
 
 export type PetStage = 'egg' | 'baby' | 'child' | 'teen' | 'adult' | 'legendary';
@@ -384,6 +396,8 @@ export function createNewPet(species: PetSpecies, name: string): PetState {
     personalityTraits: { ...DEFAULT_PERSONALITY },
     foodBravery: 0, foodsTried: [], favoriteFoods: [],
     englishLevel: 0, englishWordsLearned: [],
+    inventory: {}, stickers: [], room: { placed: {} },
+    lastGiftClaim: null, giftStreak: 0,
   };
 }
 
@@ -448,6 +462,11 @@ function migratePetState(pet: PetState): PetState {
     isAlive: true,
     englishLevel: pet.englishLevel ?? 0,
     englishWordsLearned: pet.englishWordsLearned ?? [],
+    inventory: pet.inventory ?? {},
+    stickers: pet.stickers ?? [],
+    room: pet.room && typeof pet.room === 'object' ? { placed: pet.room.placed ?? {} } : { placed: {} },
+    lastGiftClaim: pet.lastGiftClaim ?? null,
+    giftStreak: pet.giftStreak ?? 0,
     lastTreated: pet.lastTreated ?? pet.lastFed ?? now,
     lastChatted: pet.lastChatted ?? pet.born ?? now,
     // Validate timestamps — protect against NaN from corrupted localStorage

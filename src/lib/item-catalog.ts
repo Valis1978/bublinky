@@ -1,5 +1,7 @@
 import type { SkillBranch } from './pet-engine';
 
+export type AccessorySlot = 'head' | 'face' | 'neck' | 'back';
+
 export interface ItemDef {
   id: string;
   name: string;
@@ -10,6 +12,10 @@ export interface ItemDef {
   price?: number;
   effects?: { stat: string; amount: number }[];
   skillBranch?: keyof SkillBranch;
+  /** accessories only: where the item is worn on the avatar rig */
+  slot?: AccessorySlot;
+  /** decorations only: fixed spot in the pet room scene */
+  roomSlot?: 'window' | 'shelf' | 'wall' | 'floor' | 'ceiling';
 }
 
 export const ITEMS: Record<string, ItemDef> = {
@@ -35,20 +41,25 @@ export const ITEMS: Record<string, ItemDef> = {
   toy_telescope:  { id: 'toy_telescope', name: 'Dalekohled', description: 'Co je tam v dálce?', emoji: '🔭', type: 'toy', rarity: 'rare', price: 60, skillBranch: 'wisdom' },
   toy_guitar:     { id: 'toy_guitar', name: 'Kytara', description: 'Brnk brnk! 🎶', emoji: '🎸', type: 'toy', rarity: 'rare', price: 55, skillBranch: 'creativity' },
 
-  // ═══════════════ ACCESSORIES ═══════════════
-  acc_hat:        { id: 'acc_hat', name: 'Čepička', description: 'Stylová pokrývka hlavy', emoji: '🧢', type: 'accessory', rarity: 'common', price: 25 },
-  acc_bow:        { id: 'acc_bow', name: 'Mašlička', description: 'Roztomilá mašle', emoji: '🎀', type: 'accessory', rarity: 'common', price: 20 },
-  acc_glasses:    { id: 'acc_glasses', name: 'Brýle', description: 'Učený mazlíček!', emoji: '👓', type: 'accessory', rarity: 'uncommon', price: 35 },
-  acc_crown:      { id: 'acc_crown', name: 'Korunka', description: 'Pro královnu/krále!', emoji: '👑', type: 'accessory', rarity: 'rare', price: 80 },
-  acc_cape:       { id: 'acc_cape', name: 'Plášť', description: 'Superhrdina!', emoji: '🦸', type: 'accessory', rarity: 'rare', price: 70 },
-  acc_scarf:      { id: 'acc_scarf', name: 'Šálek', description: 'Na zimu!', emoji: '🧣', type: 'accessory', rarity: 'common', price: 15 },
+  // ═══════════════ ACCESSORIES (worn on the avatar rig) ═══════════════
+  acc_hat:        { id: 'acc_hat', name: 'Kšiltovka', description: 'Stylová pokrývka hlavy', emoji: '🧢', type: 'accessory', rarity: 'common', price: 25, slot: 'head' },
+  acc_bow:        { id: 'acc_bow', name: 'Mašlička', description: 'Roztomilá mašle', emoji: '🎀', type: 'accessory', rarity: 'common', price: 20, slot: 'head' },
+  acc_flower:     { id: 'acc_flower', name: 'Kytička za ouško', description: 'Voňavá parádička', emoji: '🌸', type: 'accessory', rarity: 'common', price: 30, slot: 'head' },
+  acc_glasses:    { id: 'acc_glasses', name: 'Brýle', description: 'Učený mazlíček!', emoji: '👓', type: 'accessory', rarity: 'uncommon', price: 35, slot: 'face' },
+  acc_sunglasses: { id: 'acc_sunglasses', name: 'Sluneční brýle', description: 'Frajer na pláž', emoji: '🕶️', type: 'accessory', rarity: 'uncommon', price: 40, slot: 'face' },
+  acc_scarf:      { id: 'acc_scarf', name: 'Šálička', description: 'Na zimu!', emoji: '🧣', type: 'accessory', rarity: 'common', price: 15, slot: 'neck' },
+  acc_medal:      { id: 'acc_medal', name: 'Medaile', description: 'Pro šampióna!', emoji: '🏅', type: 'accessory', rarity: 'rare', price: 60, slot: 'neck' },
+  acc_crown:      { id: 'acc_crown', name: 'Korunka', description: 'Pro královnu/krále!', emoji: '👑', type: 'accessory', rarity: 'rare', price: 80, slot: 'head' },
+  acc_cape:       { id: 'acc_cape', name: 'Plášť', description: 'Superhrdina!', emoji: '🦸', type: 'accessory', rarity: 'rare', price: 70, slot: 'back' },
+  acc_wings:      { id: 'acc_wings', name: 'Vílí křidélka', description: 'Třpytivá a lehoučká', emoji: '🧚', type: 'accessory', rarity: 'epic', price: 85, slot: 'back' },
+  acc_wizard:     { id: 'acc_wizard', name: 'Kouzelnický klobouk', description: 'Abrakadabra!', emoji: '🧙', type: 'accessory', rarity: 'epic', price: 90, slot: 'head' },
 
-  // ═══════════════ DECORATIONS ═══════════════
-  deco_plant:     { id: 'deco_plant', name: 'Květinka', description: 'Útulný pokojíček', emoji: '🌸', type: 'decoration', rarity: 'common', price: 15 },
-  deco_lamp:      { id: 'deco_lamp', name: 'Lampička', description: 'Příjemné světlo', emoji: '🔮', type: 'decoration', rarity: 'uncommon', price: 30 },
-  deco_poster:    { id: 'deco_poster', name: 'Plakát', description: 'Na zeď!', emoji: '🖼️', type: 'decoration', rarity: 'common', price: 20 },
-  deco_rug:       { id: 'deco_rug', name: 'Koberec', description: 'Měkký a teplý', emoji: '🟫', type: 'decoration', rarity: 'uncommon', price: 35 },
-  deco_stars:     { id: 'deco_stars', name: 'Svítící hvězdy', description: 'Na strop!', emoji: '⭐', type: 'decoration', rarity: 'rare', price: 50 },
+  // ═══════════════ DECORATIONS (placed in the pet room) ═══════════════
+  deco_plant:     { id: 'deco_plant', name: 'Květinka', description: 'Na parapet k okýnku', emoji: '🌸', type: 'decoration', rarity: 'common', price: 15, roomSlot: 'window' },
+  deco_lamp:      { id: 'deco_lamp', name: 'Lampička', description: 'V noci krásně svítí', emoji: '🔮', type: 'decoration', rarity: 'uncommon', price: 30, roomSlot: 'shelf' },
+  deco_poster:    { id: 'deco_poster', name: 'Plakát', description: 'Na zeď!', emoji: '🖼️', type: 'decoration', rarity: 'common', price: 20, roomSlot: 'wall' },
+  deco_rug:       { id: 'deco_rug', name: 'Kobereček', description: 'Měkký a teplý', emoji: '🟫', type: 'decoration', rarity: 'uncommon', price: 35, roomSlot: 'floor' },
+  deco_stars:     { id: 'deco_stars', name: 'Svítící hvězdy', description: 'Na strop! V noci září', emoji: '⭐', type: 'decoration', rarity: 'rare', price: 50, roomSlot: 'ceiling' },
 
   // ═══════════════ SOUVENIRS (from adventures) ═══════════════
   souv_crystal:   { id: 'souv_crystal', name: 'Krystal', description: 'Z Krystalové jeskyně', emoji: '💎', type: 'souvenir', rarity: 'rare' },
