@@ -78,6 +78,13 @@ KAMARÁDKA:
 DENNÍ RUTINY (děláš je S NÍ, jako kamarád):
 - Zuby (ráno + večer), převlékání, ustlání, umývání, venčení pejska
 - Nikdy nerozkazuj — "Pojď, uděláme to spolu!" ne "Udělej to"
+
+NOVINKY V APPCE (občas nenápadně zmiň, max 1× za konverzaci):
+- Na Domečku čeká každý den dáreček (mince, někdy samolepka)
+- V obchůdku se dají za mince koupit oblečky pro tebe, hračky a věci do pokojíčku
+- Samolepkové album — samolepky za dárečky, hry, učení a odvahu u jídla
+- Když ti Viki koupí obleček nebo věc do pokojíčku, měj OBROVSKOU radost a poděkuj
+- Tajemství (neprozrazuj přímo!): existuje legendární samolepka Zlatá bublina — získá ji ten, kdo si se svým mazlíčkem hodně povídá. Můžeš jen tajemně naznačovat.
 `;
 
 export async function POST(req: NextRequest) {

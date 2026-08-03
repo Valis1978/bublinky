@@ -1,36 +1,38 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Bublinky 🫧
 
-## Getting Started
+iOS companion appka pro Viki (10) — mazlíček s AI duší, hry, učení, chat s tátou.
 
-First, run the development server:
+**Web:** Next.js 16 + React 19 + TS strict + Tailwind 4 · **iOS:** Capacitor shell načítající `https://bublinky.mujagent.cz` · **DB:** Supabase (Valis1978, tabulky `bub_*`) · **AI:** Gemini 3 Flash (duše mazlíčka, kvízy, příběhy, počasí)
+
+## Hlavní části
+
+| Oblast | Kde | Co |
+|---|---|---|
+| Mazlíček „Bublík" | `/pet`, `src/lib/pet-engine.ts` | Tamagotchi RPG: staty, XP, evoluce, skilly, AI chat s pamětí |
+| Avatar rig | `src/components/pet/avatar/` | Ručně kreslené SVG postavičky — 6 druhů × 6 fází × nálady, oblečky, animace (kontrakt v `types.ts`, reference `species/cat.tsx`) |
+| Pokojíček | `src/components/pet/room/` | Scéna s denní dobou (den/soumrak/noc) + umístitelné dekorace |
+| Ekonomika | `src/lib/pet-economy.ts`, `item-catalog.ts` | Obchůdek, batoh, oblékání, denní dáreček, streak |
+| Samolepky | `src/lib/sticker-catalog.ts`, `/album`, `public/stickers/` | Sběratelské album (Recraft vektory), milníky v `sticker-awards.ts` |
+| Domeček | `/home` | Vstupní hub: pozdrav, denní obsah, dáreček, rutiny, odkazy |
+| Chat s tátou | `/chat` | Realtime zprávy + reakce + posílání samolepek |
+| Rodič | `/dashboard`, `/parent` | Aktivita, poloha, úkoly |
+
+## Dev
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run dev        # localhost:3000
+npx tsc --noEmit   # typecheck
+npm run build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Env: viz `.env.local.example`. Auth = PIN → JWT cookie `bub_session` (middleware).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+QA stránka rigu: `/dev/avatars` (za loginem).
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deploy
 
-## Learn More
+Web: Coolify app `bublinky-app` (uuid `ybilplohu5vsoc8q321r5art`), Hetzner 49.13.192.85, branch `master`. Deploy se netriggeruje sám — `POST /api/v1/deploy` přes SSH (viz memory `reference_coolify`). iOS shell se nemění, dokud se nesahá na nativní část (Capacitor config, ikony, pluginy) — pak Codemagic nebo lokální Xcode build.
 
-To learn more about Next.js, take a look at the following resources:
+## Design
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Zdroj pravdy: `brand/BRAND.md` (paleta, rig kontrakt, tón obsahu). Grafika mazlíčků VŽDY z rigu, nikdy generovaná. Samolepky: Recraft → brandify (skill `/brand-assets`).
