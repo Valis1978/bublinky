@@ -11,6 +11,7 @@ import Link from 'next/link';
 import { BottomNav } from '@/components/ui/BottomNav';
 import { PetGreeting } from '@/components/home/PetGreeting';
 import { DailyGiftCard } from '@/components/home/DailyGiftCard';
+import { PetPollCard } from '@/components/home/PetPollCard';
 import { loadPet, type PetState } from '@/lib/pet-engine';
 import { getDailyEntry, type DailyEntry } from '@/lib/daily-content';
 import {
@@ -104,6 +105,7 @@ export default function HomePage() {
         {pet && (
           <div className="mt-3">
             <DailyGiftCard pet={pet} onClaimed={setPet} />
+            <PetPollCard pet={pet} />
           </div>
         )}
 
