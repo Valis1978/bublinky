@@ -16,6 +16,7 @@ import type {
 } from '@/types/story';
 import { CAMEOS } from '@/lib/story-cameos';
 import { MiniPet } from '@/components/pet/avatar/PetAvatar';
+import { SCENES, variantForStep } from '@/components/stories/scenes';
 import type { PetSpecies, PetStage } from '@/lib/pet-engine';
 import { hapticTap, hapticSuccess } from '@/lib/haptics';
 import { BookCard } from './BookCard';
@@ -178,6 +179,17 @@ export function StoryReader({
           height: 168,
         }}
       >
+        {/* Illustrated genre banner — art progresses with the journey */}
+        {(() => {
+          const Scene = SCENES[setup.genre];
+          if (!Scene) return null;
+          const v = isLast ? 2 : variantForStep(Math.max(0, segments.length - 1), plannedSteps);
+          return (
+            <div className="absolute inset-0" aria-hidden>
+              <Scene variant={v} />
+            </div>
+          );
+        })()}
         {isLast && <Confetti />}
 
         <div className="absolute inset-0 flex items-end justify-center pb-1">
