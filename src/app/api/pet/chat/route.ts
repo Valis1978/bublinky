@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getFamilyContext } from '@/lib/custody-calendar';
 import { safeParseJSON } from '@/lib/safe-json';
+import { CHAT_GAMES, RIDDLES, type ChatGameMode, type ChatGameDef, type Riddle } from '@/lib/chat-games';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-3-flash-preview';
@@ -20,6 +21,25 @@ function fallbackPetReply(species: string, petName: string) {
     personalityShift: null,
     english_assessment: null,
   };
+}
+
+/** Validates the optional `lastStory` payload — the request body is untyped JSON. */
+function parseLastStory(v: unknown): { title: string; summary: string } | null {
+  if (!v || typeof v !== 'object') return null;
+  const obj = v as { title?: unknown; summary?: unknown };
+  if (typeof obj.title !== 'string' || typeof obj.summary !== 'string') return null;
+  return { title: obj.title, summary: obj.summary };
+}
+
+/** Picks `count` distinct riddles at random — never mutates the shared RIDDLES export. */
+function sampleRiddles(count: number): Riddle[] {
+  const pool = [...RIDDLES];
+  const picked: Riddle[] = [];
+  while (picked.length < count && pool.length > 0) {
+    const idx = Math.floor(Math.random() * pool.length);
+    picked.push(pool.splice(idx, 1)[0]);
+  }
+  return picked;
 }
 
 function getSupabaseAdmin() {
@@ -94,7 +114,7 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json();
-    const { petId, petName, species, stage, level, mood, hunger, happiness, energy, cleanliness, message, skills, personalityTraits, foodBravery, evolutionPath, englishLevel, englishWordsLearned } = body;
+    const { petId, petName, species, stage, level, mood, hunger, happiness, energy, cleanliness, message, skills, personalityTraits, foodBravery, evolutionPath, englishLevel, englishWordsLearned, gameMode, lastStory } = body;
 
     const supabase = getSupabaseAdmin();
 
@@ -177,6 +197,30 @@ export async function POST(req: NextRequest) {
       .filter(Boolean)
       .join(', ');
 
+    // Chat game mode (chips in PetChatPanel) — validated against the shared CHAT_GAMES contract.
+    const activeGame: ChatGameDef | null =
+      typeof gameMode === 'string' && gameMode in CHAT_GAMES ? CHAT_GAMES[gameMode as ChatGameMode] : null;
+
+    let gameModeSection = '';
+    if (activeGame) {
+      gameModeSection = `\nREŽIM HRY:\n${activeGame.prompt}`;
+      if (activeGame.id === 'hadanka') {
+        const inspiration = sampleRiddles(3)
+          .map(r => `- ${r.q} (odpověď: ${r.a}; nápověda: ${r.hint})`)
+          .join('\n');
+        gameModeSection += `\nINSPIRACE (vyber jednu z nich, nebo vymysli podobně těžkou):\n${inspiration}`;
+      }
+    }
+
+    // Hidden kick-off trigger from the chip tap — never shown to Viki as a literal message.
+    const isKickoff = message === '[START HRY]';
+
+    // Book talk — Viki just finished a story (see 'bub_last_story' in PetChatPanel).
+    const story = parseLastStory(lastStory);
+    const bookTalkSection = story
+      ? `\nViki právě dočetla příběh ${story.title}: ${story.summary}. Zeptej se JEDNOU otevřenou otázkou na dojmy (např. co by udělala jinak, co bylo nejlepší). Žádný kvíz, žádné hodnocení odpovědí.`
+      : '';
+
     const prompt = `Jsi ${petName}, ${SPECIES_PERSONALITY[species] || 'roztomilé zvířátko.'}
 
 ${VIKI_KNOWLEDGE}
@@ -202,6 +246,8 @@ ${skills ? `SKILLY: Síla ${skills.strength}, Moudrost ${skills.wisdom}, Charism
 ${memoriesText}
 ${chatHistoryText}
 ${questsText}
+${gameModeSection}
+${bookTalkSection}
 
 PRAVIDLA KONVERZACE:
 1. Max 2-3 krátké věty. Viki píše krátce, ty taky.
@@ -216,7 +262,7 @@ PRAVIDLA KONVERZACE:
 10. ANGLIČTINA: Přibližně každou 3.-5. zprávu přirozeně prohoď EN slovo/frázi podle english_level. Vždy s CZ vysvětlením (pokud level < 60). Pokud Viki správně odpoví anglicky, pochval ji!
 11. Pokud zjistíš novou informaci o Vikiině angličtině (rozumí/nerozumí slovu), vrať to v english_assessment
 
-Viki: "${message}"
+${isKickoff ? 'Uživatelka právě zapnula režim — zahaj hru first move.' : `Viki: "${message}"`}
 
 Odpověz POUZE validním JSON:
 {
