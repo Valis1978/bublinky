@@ -7,6 +7,8 @@ import { motion } from 'framer-motion';
 import { ArrowLeft, RotateCcw, Delete } from 'lucide-react';
 import Link from 'next/link';
 import { VALID_WORDS } from '@/data/wordle-words';
+import { awardGameCoins, type GameReward } from '@/lib/game-rewards';
+import { loadPet } from '@/lib/pet-engine';
 
 const WORDS = VALID_WORDS;
 
@@ -61,6 +63,7 @@ export default function WordlePage() {
   const [current, setCurrent] = useState('');
   const [gameOver, setGameOver] = useState(false);
   const [won, setWon] = useState(false);
+  const [reward, setReward] = useState<GameReward | null>(null);
 
   const letterStates = new Map<string, LetterState>();
   for (const guess of guesses) {
@@ -90,8 +93,10 @@ export default function WordlePage() {
           winGame();
           setWon(true);
           setGameOver(true);
+          setReward(awardGameCoins('wordle', (7 - newGuesses.length) / 6));
         } else if (newGuesses.length >= MAX_GUESSES) {
           setGameOver(true);
+          setReward(awardGameCoins('wordle', 0.2));
         }
         return;
       }
@@ -179,6 +184,19 @@ export default function WordlePage() {
             <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
               {won ? `🎉 Super! Za ${guesses.length} pokusů!` : `Slovo bylo: ${answer}`}
             </p>
+            {reward && (
+              <div
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+                style={{
+                  background: reward.rewarded ? 'var(--accent-soft)' : 'var(--bg-input)',
+                  color: reward.rewarded ? 'var(--accent)' : 'var(--text-muted)',
+                }}
+              >
+                {reward.rewarded
+                  ? `+${reward.coins} 🪙 pro ${loadPet()?.name ?? 'mazlíčka'}`
+                  : 'Mince za dnešek máš, hrajeme pro radost! 🫧'}
+              </div>
+            )}
             <button onClick={reset} className="accent-button px-5 py-2 text-sm inline-flex items-center gap-2">
               <RotateCcw size={14} />
               Nové slovo

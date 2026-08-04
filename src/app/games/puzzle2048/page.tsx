@@ -1,11 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useStats } from '@/hooks/useStats';
 import { BottomNav } from '@/components/ui/BottomNav';
 import { motion } from 'framer-motion';
 import { ArrowLeft, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
+import { awardGameCoins, type GameReward } from '@/lib/game-rewards';
+import { loadPet } from '@/lib/pet-engine';
 
 const SIZE = 4;
 
@@ -103,6 +105,8 @@ export default function Puzzle2048Page() {
   const [best, setBest] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [won, setWon] = useState(false);
+  const [reward, setReward] = useState<GameReward | null>(null);
+  const rewardGivenRef = useRef(false);
 
   useEffect(() => {
     const saved = localStorage.getItem('bub_2048_best');
@@ -126,13 +130,21 @@ export default function Puzzle2048Page() {
       }
 
       // Check 2048
-      if (newGrid.flat().includes(2048) && !won) {
+      const justWon = newGrid.flat().includes(2048) && !won;
+      if (justWon) {
         setWon(true);
         winGame();
       }
 
-      if (!canMove(newGrid)) {
+      const stuck = !canMove(newGrid);
+      if (stuck) {
         setGameOver(true);
+      }
+
+      if ((justWon || stuck) && !rewardGivenRef.current) {
+        rewardGivenRef.current = true;
+        const highestTile = Math.max(...newGrid.flat());
+        setReward(awardGameCoins('2048', Math.min(1, highestTile / 512)));
       }
     },
     [grid, score, best, gameOver, won, winGame]
@@ -175,6 +187,8 @@ export default function Puzzle2048Page() {
     setScore(0);
     setGameOver(false);
     setWon(false);
+    setReward(null);
+    rewardGivenRef.current = false;
   };
 
   return (
@@ -229,6 +243,19 @@ export default function Puzzle2048Page() {
             <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
               {won ? '🎉 2048! Skóre: ' + score : '😅 Konec! Skóre: ' + score}
             </p>
+            {reward && (
+              <div
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+                style={{
+                  background: reward.rewarded ? 'var(--accent-soft)' : 'var(--bg-input)',
+                  color: reward.rewarded ? 'var(--accent)' : 'var(--text-muted)',
+                }}
+              >
+                {reward.rewarded
+                  ? `+${reward.coins} 🪙 pro ${loadPet()?.name ?? 'mazlíčka'}`
+                  : 'Mince za dnešek máš, hrajeme pro radost! 🫧'}
+              </div>
+            )}
             <button onClick={reset} className="accent-button px-5 py-2 text-sm inline-flex items-center gap-2">
               <RotateCcw size={14} />
               Znovu

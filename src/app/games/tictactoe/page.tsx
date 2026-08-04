@@ -8,6 +8,8 @@ import Link from 'next/link';
 import { useAuth } from '@/hooks/useAuth';
 import { useStats } from '@/hooks/useStats';
 import { createClient } from '@/lib/supabase/client';
+import { awardGameCoins, type GameReward } from '@/lib/game-rewards';
+import { loadPet } from '@/lib/pet-engine';
 
 type Cell = 'X' | 'O' | null;
 type GameMode = 'menu' | 'ai' | 'multi';
@@ -162,6 +164,7 @@ export default function TicTacToePage() {
   const [lastMove, setLastMove] = useState<[number, number] | null>(null);
   const [multiStatus, setMultiStatus] = useState<'waiting' | 'playing'>('waiting');
   const [mySymbol, setMySymbol] = useState<'X' | 'O'>('X');
+  const [reward, setReward] = useState<GameReward | null>(null);
   const channelRef = useRef<ReturnType<ReturnType<typeof createClient>['channel']> | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
 
@@ -232,6 +235,7 @@ export default function TicTacToePage() {
         if (result.winner === 'X') {
           winGame();
           setScores((s) => ({ ...s, player: s.player + 1 }));
+          setReward(awardGameCoins('tictactoe', 1));
           return;
         }
 
@@ -247,6 +251,7 @@ export default function TicTacToePage() {
           const aiResult = checkWinner(aiBoard);
           if (aiResult.winner === 'O') {
             setScores((s) => ({ ...s, opponent: s.opponent + 1 }));
+            setReward(awardGameCoins('tictactoe', 0.25));
           }
         }, 300);
       } else {
@@ -274,6 +279,7 @@ export default function TicTacToePage() {
     setBoard(createBoard());
     setLastMove(null);
     setIsPlayerTurn(mode === 'ai' || mySymbol === 'X');
+    setReward(null);
     if (mode === 'multi') {
       channelRef.current?.send({ type: 'broadcast', event: 'reset', payload: {} });
     }
@@ -411,7 +417,20 @@ export default function TicTacToePage() {
 
         {/* Game over button */}
         {gameOver && (
-          <div className="text-center mt-2">
+          <div className="text-center mt-2 space-y-2">
+            {reward && (
+              <div
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+                style={{
+                  background: reward.rewarded ? 'var(--accent-soft)' : 'var(--bg-input)',
+                  color: reward.rewarded ? 'var(--accent)' : 'var(--text-muted)',
+                }}
+              >
+                {reward.rewarded
+                  ? `+${reward.coins} 🪙 pro ${loadPet()?.name ?? 'mazlíčka'}`
+                  : 'Mince za dnešek máš, hrajeme pro radost! 🫧'}
+              </div>
+            )}
             <button onClick={reset} className="accent-button px-6 py-2 text-sm inline-flex items-center gap-2">
               <RotateCcw size={14} />
               Nová hra

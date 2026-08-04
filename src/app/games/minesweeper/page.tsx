@@ -6,6 +6,8 @@ import { BottomNav } from '@/components/ui/BottomNav';
 import { motion } from 'framer-motion';
 import { ArrowLeft, RotateCcw, Flag, Bomb } from 'lucide-react';
 import Link from 'next/link';
+import { awardGameCoins, type GameReward } from '@/lib/game-rewards';
+import { loadPet } from '@/lib/pet-engine';
 
 const ROWS = 12;
 const COLS = 10;
@@ -91,6 +93,7 @@ export default function MinesweeperPage() {
   const [gameOver, setGameOver] = useState(false);
   const [isWon, setIsWon] = useState(false);
   const [flagMode, setFlagMode] = useState(false);
+  const [reward, setReward] = useState<GameReward | null>(null);
 
   const flagsPlaced = board.flat().filter((c) => c.isFlagged).length;
   const revealed = board.flat().filter((c) => c.isRevealed).length;
@@ -103,6 +106,7 @@ export default function MinesweeperPage() {
         setIsWon(true);
         setGameOver(true);
         winGame();
+        setReward(awardGameCoins('minesweeper', 1));
       }
     },
     [winGame]
@@ -127,6 +131,7 @@ export default function MinesweeperPage() {
       );
       setBoard(newBoard);
       setGameOver(true);
+      setReward(awardGameCoins('minesweeper', 0.25));
       return;
     }
 
@@ -140,6 +145,7 @@ export default function MinesweeperPage() {
     setGameOver(false);
     setIsWon(false);
     setFlagMode(false);
+    setReward(null);
   };
 
   return (
@@ -223,6 +229,19 @@ export default function MinesweeperPage() {
             <p className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>
               {isWon ? '🎉 Vyhrála jsi!' : '💥 Bum!'}
             </p>
+            {reward && (
+              <div
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+                style={{
+                  background: reward.rewarded ? 'var(--accent-soft)' : 'var(--bg-input)',
+                  color: reward.rewarded ? 'var(--accent)' : 'var(--text-muted)',
+                }}
+              >
+                {reward.rewarded
+                  ? `+${reward.coins} 🪙 pro ${loadPet()?.name ?? 'mazlíčka'}`
+                  : 'Mince za dnešek máš, hrajeme pro radost! 🫧'}
+              </div>
+            )}
             <button onClick={reset} className="accent-button px-6 py-2.5 text-sm inline-flex items-center gap-2">
               <RotateCcw size={16} />
               Znovu

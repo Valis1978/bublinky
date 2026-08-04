@@ -6,6 +6,8 @@ import { BottomNav } from '@/components/ui/BottomNav';
 import { motion } from 'framer-motion';
 import { ArrowLeft, RotateCcw, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
+import { awardGameCoins, type GameReward } from '@/lib/game-rewards';
+import { loadPet } from '@/lib/pet-engine';
 
 interface QuizItem {
   emojis: string;
@@ -58,6 +60,7 @@ export default function EmojiQuizPage() {
   const [score, setScore] = useState(0);
   const [selected, setSelected] = useState<string | null>(null);
   const [showResult, setShowResult] = useState(false);
+  const [reward, setReward] = useState<GameReward | null>(null);
 
   const current = questions[currentIdx];
   const isFinished = showResult;
@@ -75,6 +78,7 @@ export default function EmojiQuizPage() {
           const finalScore = answer === current.answer ? score + 1 : score;
           const pct = Math.round((finalScore / questions.length) * 100);
           if (pct >= 80) winGame();
+          setReward(awardGameCoins('emoji-quiz', finalScore / questions.length));
           setShowResult(true);
         } else {
           setCurrentIdx((i) => i + 1);
@@ -100,9 +104,22 @@ export default function EmojiQuizPage() {
           <h2 className="text-2xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
             {pct >= 80 ? 'Super!' : pct >= 50 ? 'Dobrý!' : 'Zkus znovu!'}
           </h2>
-          <p className="text-3xl font-bold mb-6" style={{ color: 'var(--accent)' }}>
+          <p className="text-3xl font-bold mb-4" style={{ color: 'var(--accent)' }}>
             {score} / {questions.length}
           </p>
+          {reward && (
+            <div
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium mb-6"
+              style={{
+                background: reward.rewarded ? 'var(--accent-soft)' : 'var(--bg-input)',
+                color: reward.rewarded ? 'var(--accent)' : 'var(--text-muted)',
+              }}
+            >
+              {reward.rewarded
+                ? `+${reward.coins} 🪙 pro ${loadPet()?.name ?? 'mazlíčka'}`
+                : 'Mince za dnešek máš, hrajeme pro radost! 🫧'}
+            </div>
+          )}
           <div className="flex gap-3">
             <button onClick={restart} className="accent-button px-6 py-2.5 text-sm inline-flex items-center gap-2">
               <RotateCcw size={14} />

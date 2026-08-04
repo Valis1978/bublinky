@@ -6,6 +6,8 @@ import { BottomNav } from '@/components/ui/BottomNav';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ArrowLeft, Sparkles, BookOpen, Star, Users, Lightbulb, Loader2, Trophy, RotateCcw } from 'lucide-react';
 import Link from 'next/link';
+import { awardGameCoins, type GameReward } from '@/lib/game-rewards';
+import { loadPet } from '@/lib/pet-engine';
 
 interface QuizQuestion {
   question: string;
@@ -35,6 +37,7 @@ export default function AIQuizPage() {
   const [answered, setAnswered] = useState(false);
   const [finished, setFinished] = useState(false);
   const [tab, setTab] = useState<Tab>('quiz');
+  const [reward, setReward] = useState<GameReward | null>(null);
 
   const generateQuiz = async () => {
     if (!topic.trim()) return;
@@ -47,6 +50,7 @@ export default function AIQuizPage() {
     setAnswered(false);
     setFinished(false);
     setTab('quiz');
+    setReward(null);
 
     try {
       const res = await fetch('/api/quiz', {
@@ -79,6 +83,7 @@ export default function AIQuizPage() {
       setFinished(true);
       const finalScore = score + (selected === quizData.questions[currentQ].correct ? 1 : 0);
       completeSession(finalScore, quizData.questions.length);
+      setReward(awardGameCoins('ai-quiz', finalScore / quizData.questions.length));
     } else {
       setCurrentQ((q) => q + 1);
       setSelected(null);
@@ -94,6 +99,7 @@ export default function AIQuizPage() {
     setSelected(null);
     setAnswered(false);
     setFinished(false);
+    setReward(null);
   };
 
   const suggestions = [
@@ -369,6 +375,18 @@ export default function AIQuizPage() {
               </div>
             </div>
 
+            {reward && (
+              <div
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${
+                  reward.rewarded ? 'bg-amber-50 text-amber-700' : 'bg-violet-50 text-violet-500'
+                }`}
+              >
+                {reward.rewarded
+                  ? `+${reward.coins} 🪙 pro ${loadPet()?.name ?? 'mazlíčka'}`
+                  : 'Mince za dnešek máš, hrajeme pro radost! 🫧'}
+              </div>
+            )}
+
             <div className="flex gap-3">
               <button
                 onClick={() => {
@@ -377,6 +395,7 @@ export default function AIQuizPage() {
                   setSelected(null);
                   setAnswered(false);
                   setFinished(false);
+                  setReward(null);
                 }}
                 className="flex-1 py-3 rounded-xl bg-violet-100 text-violet-700 font-medium"
               >

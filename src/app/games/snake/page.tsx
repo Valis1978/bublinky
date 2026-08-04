@@ -6,6 +6,8 @@ import { BottomNav } from '@/components/ui/BottomNav';
 import { motion } from 'framer-motion';
 import { ArrowLeft, RotateCcw, ArrowUp, ArrowDown, ArrowRight, ChevronLeft } from 'lucide-react';
 import Link from 'next/link';
+import { awardGameCoins, type GameReward } from '@/lib/game-rewards';
+import { loadPet } from '@/lib/pet-engine';
 
 const GRID = 12;
 const CELL_SIZE = 26;
@@ -34,6 +36,7 @@ export default function SnakePage() {
   const [score, setScore] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [bestScore, setBestScore] = useState(0);
+  const [reward, setReward] = useState<GameReward | null>(null);
   const dirRef = useRef(direction);
 
   useEffect(() => {
@@ -95,6 +98,7 @@ export default function SnakePage() {
             setBestScore(score);
             localStorage.setItem('bub_snake_best', String(score));
           }
+          setReward(awardGameCoins('snake', Math.min(1, score / 15)));
           return prev;
         }
 
@@ -107,6 +111,7 @@ export default function SnakePage() {
             setBestScore(score);
             localStorage.setItem('bub_snake_best', String(score));
           }
+          setReward(awardGameCoins('snake', Math.min(1, score / 15)));
           return prev;
         }
 
@@ -134,6 +139,7 @@ export default function SnakePage() {
     setScore(0);
     setGameOver(false);
     setIsPlaying(true);
+    setReward(null);
   };
 
   return (
@@ -202,6 +208,19 @@ export default function SnakePage() {
               <p className="text-white font-bold text-lg">
                 {gameOver ? `💀 Skóre: ${score}` : '🐍'}
               </p>
+              {gameOver && reward && (
+                <div
+                  className="px-3 py-1.5 rounded-full text-xs font-medium"
+                  style={{
+                    background: reward.rewarded ? 'rgba(255,255,255,0.9)' : 'rgba(255,255,255,0.15)',
+                    color: reward.rewarded ? 'var(--accent)' : 'white',
+                  }}
+                >
+                  {reward.rewarded
+                    ? `+${reward.coins} 🪙 pro ${loadPet()?.name ?? 'mazlíčka'}`
+                    : 'Mince za dnešek máš, hrajeme pro radost! 🫧'}
+                </div>
+              )}
               <button onClick={start} className="accent-button px-5 py-2 text-sm inline-flex items-center gap-2">
                 <RotateCcw size={14} />
                 {gameOver ? 'Znovu' : 'Hrát'}

@@ -6,6 +6,8 @@ import { BottomNav } from '@/components/ui/BottomNav';
 import { motion } from 'framer-motion';
 import { ArrowLeft, RotateCcw, Trophy } from 'lucide-react';
 import Link from 'next/link';
+import { awardGameCoins, type GameReward } from '@/lib/game-rewards';
+import { loadPet } from '@/lib/pet-engine';
 
 const EMOJI_SETS = [
   ['🐶', '🐱', '🐰', '🦊', '🐻', '🐼', '🐨', '🦁', '🐸', '🦋', '🐧', '🦄'],
@@ -51,6 +53,7 @@ export default function MemoryPage() {
   const [matches, setMatches] = useState(0);
   const [bestScore, setBestScore] = useState<number | null>(null);
   const [isLocked, setIsLocked] = useState(false);
+  const [reward, setReward] = useState<GameReward | null>(null);
 
   const totalPairs = cards.length / 2;
   const isWon = matches === totalPairs;
@@ -93,6 +96,8 @@ export default function MemoryPage() {
                   setBestScore(finalMoves);
                   localStorage.setItem('bub_memory_best', String(finalMoves));
                 }
+                const idealMoves = totalPairs * 2;
+                setReward(awardGameCoins('memory', Math.min(1, idealMoves / finalMoves)));
               }
               return newMatches;
             });
@@ -122,6 +127,7 @@ export default function MemoryPage() {
     setMoves(0);
     setMatches(0);
     setIsLocked(false);
+    setReward(null);
   };
 
   return (
@@ -207,6 +213,19 @@ export default function MemoryPage() {
                 Super! Za {moves} tahů!
               </p>
             </div>
+            {reward && (
+              <div
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium"
+                style={{
+                  background: reward.rewarded ? 'var(--accent-soft)' : 'var(--bg-input)',
+                  color: reward.rewarded ? 'var(--accent)' : 'var(--text-muted)',
+                }}
+              >
+                {reward.rewarded
+                  ? `+${reward.coins} 🪙 pro ${loadPet()?.name ?? 'mazlíčka'}`
+                  : 'Mince za dnešek máš, hrajeme pro radost! 🫧'}
+              </div>
+            )}
             <button onClick={reset} className="accent-button px-6 py-2.5 text-sm inline-flex items-center gap-2">
               <RotateCcw size={16} />
               Znovu
