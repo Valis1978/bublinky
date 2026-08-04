@@ -1,5 +1,38 @@
 # Changelog
 
+## 2.1.0 — 2026-08-04 „Příběhy ožily"
+
+### CZ
+
+**Interaktivní příběhy** (postaveno na výzkumu dětské motivace)
+- Příběh se větví: 6 segmentů, po každém volba (sloveso + emoji), hrdinka = Viki a její mazlíček jménem
+- **Knižní cameo**: ~ve 30 % příběhů nečekaně vstoupí postava z dětské knížky (Harry Potter, Hermiona, Matylda, Pipi, Greg z Poseroutky, Malý princ, Fifinka, Hihlík, Mikeš, Ferda, Ronja, Karlík, Kvak) — mluví svým hlasem, zeptá se „už jsi o mně četla?" a nadchne svým světem; titul knihy postava nikdy nejmenuje (žádná skrytá reklama) — fakta ukáže kartička „je z knížky" až po příběhu
+- **Polička** — soukromý čtenářský deníček (chci číst → čtu → dočteno), bez počítadel, bez odměn, bez streaků (overjustification guardrail)
+- Moje příběhy — uložené příběhy k opakovanému čtení
+- Dvoufázová bezpečnost: zákazy v promptu + moderační kontrola každého segmentu
+- Book talk: po dočteném příběhu se mazlíček sám zeptá na dojmy (otevřená otázka, nikdy kvíz)
+
+**Chat hry s mazlíčkem**
+- Režimy: Hádanky 🧩 · Hádej zvíře 🦁 · Příběh na střídačku 📖 · Co bys radši? 🤔 (30 hádanek + 30 otázek jako záloha)
+
+**Nové minihry**
+- **Bublinkovaná** 🫧 — canvas pop hra: 60s kola, hvězdičkové/zlaté/obří bubliny, série → duhový žolík, mazlíček fandí; „Klídek režim" bez času a bodů
+- **Módní přehlídka** 👗 — obleč mazlíčka z vlastních oblečků na 3 témata, porota tří Bublíků boduje (nikdy zdrcující) s vtipnými komentáři
+
+**Odměny ve hrách**
+- Všech 8 stávajících her dává mince (první 3 kola denně, pravidla viditelná); i „prohra" něco dá — žádný trest
+
+**Denní anketka**
+- Mazlíček se jednou denně hravě zeptá (40 otázek, buď/anebo) — odpovědi se propisují do jeho paměti, takže Viki skutečně poznává
+
+**Ostatní**
+- Domeček: anketka karta; Hry: nový hub s fandícím mazlíčkem
+- Oprava: GOOGLE_API_KEY v produkci byl neplatný (stará rotace) — AI duše, počasí a kvízy zase žijí
+
+### EN
+
+**Interactive branching stories** (6 segments, verb+emoji choices, Viki + her pet as heroes) with **book-character cameos** (13 beloved characters, original voices, "have you read about me?" — never naming their book in-fiction; factual book card outside the story), a private reading shelf (no counters/rewards/streaks per overjustification research), saved stories, two-phase content safety, and post-story book talk in pet chat. **Chat game modes** (riddles, 20 questions, alternating story, would-you-rather). **Two new minigames**: canvas Bubble Pop (60s rounds, calm mode, juice) and Fashion Show (dress your pet from owned accessories, three-pet jury). **Coin rewards** across all 8 existing games (first 3 rounds/day). **Daily pet poll** feeding the AI soul's memories. Fixed an invalid production GOOGLE_API_KEY that had silently broken all AI features.
+
 ## 2.0.1 — 2026-08-04
 
 ### CZ
