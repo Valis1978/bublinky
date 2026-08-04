@@ -69,10 +69,20 @@ function Skeleton() {
   );
 }
 
+function readUserRole(): 'child' | 'parent' {
+  try {
+    const raw = localStorage.getItem('bub_user');
+    return raw && JSON.parse(raw)?.role === 'parent' ? 'parent' : 'child';
+  } catch {
+    return 'child';
+  }
+}
+
 export default function HomePage() {
   const [ready, setReady] = useState(false);
   const [pet, setPet] = useState<PetState | null>(null);
   const [name, setName] = useState('Viki');
+  const [role, setRole] = useState<'child' | 'parent'>('child');
   const [entry, setEntry] = useState<DailyEntry | null>(null);
   const [routines, setRoutines] = useState<RoutineStep[]>([]);
   const [completed, setCompleted] = useState<string[]>([]);
@@ -82,12 +92,15 @@ export default function HomePage() {
     const timeOfDay = getCurrentTimeOfDay();
     setPet(loadPet());
     setName(readUserName());
+    setRole(readUserRole());
     setEntry(getDailyEntry());
     setRoutines(getRoutinesByTime(timeOfDay).slice(0, 3));
     setCompleted(getCompletedRoutines());
     setGreeting(greetingFor(timeOfDay));
     setReady(true);
   }, []);
+
+  const isParent = role === 'parent';
 
   if (!ready || !entry) {
     return <Skeleton />;
@@ -100,16 +113,18 @@ export default function HomePage() {
           {greeting.text}, {name}! {greeting.emoji}
         </h1>
 
-        <PetGreeting pet={pet} entry={entry} />
+        {/* The pet rituals (greeting, gift, poll) belong to Viki — the parent
+            sees a plain launcher instead. */}
+        {!isParent && <PetGreeting pet={pet} entry={entry} />}
 
-        {pet && (
+        {!isParent && pet && (
           <div className="mt-3">
             <DailyGiftCard pet={pet} onClaimed={setPet} />
             <PetPollCard pet={pet} />
           </div>
         )}
 
-        <section className="mt-4">
+        <section className="mt-4" hidden={isParent}>
           <h2 className="text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
             Dnešní parta úkolů
           </h2>
@@ -146,7 +161,10 @@ export default function HomePage() {
             Rychlé odkazy
           </h2>
           <div className="grid grid-cols-3 gap-3">
-            {QUICK_LINKS.map(link => (
+            {(isParent
+              ? [{ href: '/dashboard', emoji: '📊', label: 'Dashboard' }, ...QUICK_LINKS.filter(l => l.href !== '/pet')]
+              : QUICK_LINKS
+            ).map(link => (
               <Link
                 key={link.href}
                 href={link.href}

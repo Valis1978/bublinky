@@ -29,6 +29,7 @@ const CHILD_ITEMS: NavItem[] = [
 ];
 
 const PARENT_ITEMS: NavItem[] = [
+  { href: '/home', label: 'Domů', icon: Home },
   { href: '/chat', label: 'Chat', icon: MessageCircle },
   { href: '/tasks', label: 'Úkoly', icon: ListTodo },
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
