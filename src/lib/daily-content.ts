@@ -17,39 +17,19 @@ export interface DailyEntry {
 }
 
 export const DAILY_ENTRIES: DailyEntry[] = [
-  { id: 'j01', kind: 'joke', text: 'Víš, proč si bublina nikdy nestěžuje? Protože vždycky praskne smíchy! 🫧' },
   { id: 'f01', kind: 'fact', text: 'Kočky spí až 16 hodin denně. To je víc než půl dne! 😴' },
   { id: 'c01', kind: 'challenge', text: 'Dnešní mise: nauč mě jedno nové slovo, které jsi dnes slyšela ve škole! 📚' },
   { id: 'e01', kind: 'english', text: 'Dneska jsem se naučil slovíčko: rainbow! To znamená duha. Umíš ho vyslovit? 🌈', english: { word: 'rainbow', meaning: 'duha' } },
   { id: 'f02', kind: 'fact', text: 'Psi poznají, jak se cítíš, podle vůně. Fakt! Mají nos jako superhrdina. 🐶' },
-  { id: 'j02', kind: 'joke', text: 'Co řekne jednorožec, když se mu něco povede? „To byl roh-odně dobrý nápad!" 🦄' },
   { id: 'c02', kind: 'challenge', text: 'Dnešní mise: zkus nakreslit, jak vypadám, když mám radost! Ukaž mi to! 🎨' },
   { id: 'f03', kind: 'fact', text: 'Lišky umí slyšet myš pod sněhem až na 40 metrů. Mají uši jako radar! 🦊' },
   { id: 'e02', kind: 'english', text: 'Slovíčko dne: brave — odvážná. You are brave! Ty jsi odvážná! 💪', english: { word: 'brave', meaning: 'odvážný/á' } },
-  { id: 'j03', kind: 'joke', text: 'Proč chodí draci do školy? Aby jim to pálilo! 🔥' },
   { id: 'c03', kind: 'challenge', text: 'Dnešní mise: vymysli mi přezdívku, kterou mi budeš říkat, jen když uděláme streak! 🔥' },
   { id: 'f04', kind: 'fact', text: 'Králíci dělají radostné výskoky, kterým se říká binky. Když hopsnu, mám binky den! 🐰' },
 
   // --- extended pool (v2.0 — Domeček) ---
 
   // Jokes — zvířata, bubliny, škola
-  { id: 'j04', kind: 'joke', text: 'Víš, jak si bublina hraje na schovávanou? Vyletí do vzduchu a nikdo ji nenajde! 🫧💨' },
-  { id: 'j05', kind: 'joke', text: 'Proč má žirafa tak dlouhý krk? Aby si mohla dát pusu mráčkům! ☁️🦒' },
-  { id: 'j06', kind: 'joke', text: 'Co řekne tužka, když jde do školy? „Jsem naostřená a připravená!" ✏️' },
-  { id: 'j07', kind: 'joke', text: 'Proč si sova nikdy nezapomene úkol? Má v hlavě opravdu moudrou sovu! 🦉' },
-  { id: 'j08', kind: 'joke', text: 'Jak se říká bublině, co vyhrála závod? Nejrychlejší prsk v celém městě! 🫧🏆' },
-  { id: 'j09', kind: 'joke', text: 'Proč chodí medvěd pomalu? Aby si cestou mohl broukat medvědí písničku! 🐻🎵' },
-  { id: 'j10', kind: 'joke', text: 'Co dělá měsíc, když má domácí úkol? Počítá hvězdy! ⭐📓' },
-  { id: 'j11', kind: 'joke', text: 'Proč nosí zebra pruhy? Aby ji všichni hned poznali na fotce! 🦓📸' },
-  { id: 'j12', kind: 'joke', text: 'Víš, proč mají bubliny rády duhu? Najdou v ní úplně všechny svoje barvičky! 🌈🫧' },
-  { id: 'j13', kind: 'joke', text: 'Co řekne školní taška v pondělí ráno? „Zase plná dobrodružství!" 🎒' },
-  { id: 'j14', kind: 'joke', text: 'Proč má klokan kapsu? Aby měl kam schovat poklad, který cestou najde! 🦘💎' },
-  { id: 'j15', kind: 'joke', text: 'Co dělá bublina, když je jí horko? Vyletí až úplně nahoru, kde je nejvíc vánku! 🫧☁️' },
-  { id: 'j16', kind: 'joke', text: 'Proč chodí tučňáci pořád jako ve fráčku? Protože každý den je pro ně slavnostní! 🐧' },
-  { id: 'j17', kind: 'joke', text: 'Co řekne pastelka, když domaluje obrázek? „Uf, to bylo barevné dobrodružství!" 🖍️' },
-  { id: 'j18', kind: 'joke', text: 'Proč mají koťata tak ráda klubíčka? Dá se s nimi tancovat celý den! 🧶🐱' },
-  { id: 'j19', kind: 'joke', text: 'Víš, kolik váží bublina? Míň než peříčko a víc než úsměv! 🫧🪶' },
-  { id: 'j20', kind: 'joke', text: 'Co řekne zvonek o přestávce? „Cinky cink, teď je čas jít hrát!" 🔔' },
 
   // Facts — zvířata, vesmír, tělo, příroda (ověřitelné, čísla jen skutečná)
   { id: 'f05', kind: 'fact', text: 'Chobotnice mají tři srdce! Dvě jim pumpují krev do žaber a jedno do zbytku těla. 🐙' },
@@ -92,7 +72,6 @@ export const DAILY_ENTRIES: DailyEntry[] = [
   { id: 'f23', kind: 'fact', text: 'Vědci zjistili, že kamarádství nejvíc rostou ze společných zážitků — i z úplně obyčejných, jako je cesta ze školy. 🚶‍♀️' },
   { id: 'f24', kind: 'fact', text: 'Když pocit pojmenuješ nahlas („jsem naštvaná", „je mi smutno"), mozek se doopravdy trochu uklidní. Funguje to i šeptem. 🧠' },
   { id: 'f25', kind: 'fact', text: 'Hádka kamarádství nemusí zbořit — páry kamarádek, které se umí usmířit, bývají nakonec nejpevnější. 🤝' },
-  { id: 'j21', kind: 'joke', text: 'Víš, co si řekly dvě ponožky po hádce? „Zase k sobě patříme — jinak nás sní lichožrout!" 🧦' },
   { id: 'c19', kind: 'challenge', text: 'Dnešní mise: zkus si dnes všimnout, co asi cítí někdo jiný — třeba spolužačka, co je potichu. Nemusíš nic dělat, jen si všimnout. 👀' },
 
   // English words — barvy, zvířata, pocity, počasí, jednoduché fráze
