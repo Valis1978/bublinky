@@ -23,7 +23,8 @@ export default function LoginPage() {
 
     if (result.success) {
       setTheme(selectedRole === 'parent' ? 'tata' : 'viki');
-      window.location.href = '/chat';
+      // Root routes by role: Viki → Domeček (joke of the day first), táta → chat
+      window.location.href = '/';
     } else {
       setError(result.error || 'Nesprávný PIN');
       setLoading(false);
