@@ -1,5 +1,19 @@
 # Changelog
 
+## 2.0.1 — 2026-08-04
+
+### CZ
+
+**Fix (DB)**
+- Migrace `20260803_v2_economy_chat.sql` při přidávání samolepek omylem vyhodila `'video'` z check constraintu `bub_messages_type_check` — poslání videa v chatu padalo na 500 (Postgres 23514)
+- Nová migrace `20260804_restore_video_message_type.sql` vrací plnou sadu typů (`text`, `photo`, `voice`, `video`, `sticker`); na živé DB už aplikováno
+
+### EN
+
+**Fix (DB)**
+- Migration `20260803_v2_economy_chat.sql` accidentally dropped `'video'` from the `bub_messages_type_check` constraint while adding stickers — sending a chat video failed with a 500 (Postgres 23514)
+- Follow-up migration `20260804_restore_video_message_type.sql` restores the full type set (`text`, `photo`, `voice`, `video`, `sticker`); already applied to the live DB
+
 ## 2.0.0 — 2026-08-03 „Bublíci ožili"
 
 ### CZ
