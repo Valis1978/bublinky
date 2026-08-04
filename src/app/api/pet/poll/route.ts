@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { embedText, toVectorLiteral } from '@/lib/server/embeddings';
 
 function getSupabaseAdmin() {
   return createClient(
@@ -42,12 +43,29 @@ export async function POST(req: NextRequest) {
     }
 
     // Same insert shape as src/app/api/pet/chat/route.ts (pet_id, category, content, importance)
-    const { error } = await supabase.from('bub_pet_memories').insert({
+    const memory = {
       pet_id: pet.id,
       category: 'preference',
       content: `Anketka: ${q} → Viki: ${a}`,
       importance: 6,
-    });
+    };
+
+    // Embedding is a soft dependency — the poll answer is stored either way.
+    let vectorLiteral: string | null = null;
+    try {
+      vectorLiteral = toVectorLiteral(await embedText(memory.content, 'RETRIEVAL_DOCUMENT'));
+    } catch (embedErr) {
+      console.error('[PetPoll] memory embedding failed:', embedErr);
+    }
+
+    let { error } = await supabase
+      .from('bub_pet_memories')
+      .insert(vectorLiteral ? { ...memory, embedding: vectorLiteral } : memory);
+
+    if (error && vectorLiteral) {
+      // Vector column may not exist yet (migration not applied) — retry plain.
+      ({ error } = await supabase.from('bub_pet_memories').insert(memory));
+    }
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });

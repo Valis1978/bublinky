@@ -1,12 +1,22 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { NextRequest, NextResponse, after } from 'next/server';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getFamilyContext } from '@/lib/custody-calendar';
 import { safeParseJSON } from '@/lib/safe-json';
 import { CHAT_GAMES, RIDDLES, type ChatGameMode, type ChatGameDef, type Riddle } from '@/lib/chat-games';
+import { embedText, toVectorLiteral } from '@/lib/server/embeddings';
+import { maybeConsolidateProfile } from '@/lib/server/pet-profile';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-3-flash-preview';
 const REQUEST_TIMEOUT_MS = 12000;
+
+/** Recall sizes for the pgvector RPCs. */
+const RECALL_MEMORIES = 8;
+const RECALL_CHAT = 6;
+/** Above this cosine similarity a new memory is treated as already known. */
+const MEMORY_DEDUP_THRESHOLD = 0.93;
+/** Recent-window size (kept verbatim in the prompt). */
+const CHAT_WINDOW = 50;
 
 const SPECIES_SOUNDS: Record<string, string> = {
   cat: 'Mňau', dog: 'Haf', bunny: 'Hop hop', dragon: 'Frrr', unicorn: 'Iháá', fox: 'Yip',
@@ -47,6 +57,162 @@ function getSupabaseAdmin() {
     process.env.NEXT_PUBLIC_SUPABASE_URL || '',
     process.env.SUPABASE_SERVICE_ROLE_KEY || ''
   );
+}
+
+// ---------------------------------------------------------------------------
+// RAG memory (pgvector). Every piece is a SOFT dependency: if the embedding
+// API, the RPCs or the migration are unavailable we fall back to the previous
+// behaviour (top-20 memories by importance) instead of failing the chat.
+// ---------------------------------------------------------------------------
+
+type MemoryRow = { content: string; category: string };
+type RecalledChatRow = { role: string; content: string; created_at: string };
+type InsertedChatRow = { id: string; role: string };
+
+/** "12. 7." — short Czech date for recalled older messages. */
+function shortCzechDate(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return `${d.getDate()}. ${d.getMonth() + 1}.`;
+}
+
+/** Embeds the query; resolves to null on any failure so callers can fall back. */
+function embedQuery(text: string): Promise<number[] | null> {
+  if (!text) return Promise.resolve(null);
+  return embedText(text, 'RETRIEVAL_QUERY').catch((err) => {
+    console.error('[PetChat] query embedding failed:', err);
+    return null;
+  });
+}
+
+/** Semantic recall for both corpora. Empty arrays mean "nothing found → fall back". */
+async function recallByVector(
+  supabase: SupabaseClient,
+  petId: string,
+  queryEmbedding: number[]
+): Promise<{ memories: MemoryRow[]; chat: RecalledChatRow[] }> {
+  try {
+    const queryLiteral = toVectorLiteral(queryEmbedding);
+    const [memRes, chatRes] = await Promise.all([
+      supabase.rpc('match_pet_memories', {
+        p_pet_id: petId,
+        p_query: queryLiteral,
+        p_count: RECALL_MEMORIES,
+      }),
+      supabase.rpc('match_pet_chat', {
+        p_pet_id: petId,
+        p_query: queryLiteral,
+        p_count: RECALL_CHAT,
+      }),
+    ]);
+
+    if (memRes.error) console.error('[PetChat] match_pet_memories failed:', memRes.error);
+    if (chatRes.error) console.error('[PetChat] match_pet_chat failed:', chatRes.error);
+
+    return {
+      memories: (memRes.data as MemoryRow[] | null) ?? [],
+      chat: (chatRes.data as RecalledChatRow[] | null) ?? [],
+    };
+  } catch (err) {
+    console.error('[PetChat] vector recall failed:', err);
+    return { memories: [], chat: [] };
+  }
+}
+
+/** Living profile written by maybeConsolidateProfile(). '' when missing. */
+async function loadProfile(supabase: SupabaseClient, petId: string): Promise<string> {
+  try {
+    const { data, error } = await supabase
+      .from('bub_pet_profile')
+      .select('content')
+      .eq('pet_id', petId)
+      .maybeSingle();
+    if (error) return '';
+    const row = data as { content: string | null } | null;
+    return row?.content?.trim() ?? '';
+  } catch {
+    return '';
+  }
+}
+
+/** Attaches embeddings to the two rows we just wrote. Best effort, never throws. */
+async function embedChatRows(
+  supabase: SupabaseClient,
+  rows: InsertedChatRow[],
+  userText: string,
+  petText: string
+): Promise<void> {
+  const idFor = (role: string) => rows.find((r) => r.role === role)?.id;
+  const targets: Array<{ id: string; text: string }> = [];
+
+  const userRowId = idFor('user');
+  const petRowId = idFor('pet');
+  if (userRowId && userText) targets.push({ id: userRowId, text: userText });
+  if (petRowId && petText) targets.push({ id: petRowId, text: petText });
+
+  await Promise.all(
+    targets.map(async ({ id, text }) => {
+      try {
+        const vector = await embedText(text, 'RETRIEVAL_DOCUMENT');
+        const { error } = await supabase
+          .from('bub_pet_chat_log')
+          .update({ embedding: toVectorLiteral(vector) })
+          .eq('id', id);
+        if (error) console.error('[PetChat] chat embedding update failed:', error);
+      } catch (err) {
+        console.error('[PetChat] chat embedding failed:', err);
+      }
+    })
+  );
+}
+
+/**
+ * Stores a memory with its embedding. With `dedup` a near-identical memory
+ * (similarity > MEMORY_DEDUP_THRESHOLD) is dropped instead of piling up.
+ * Falls back to a plain insert whenever embedding or the vector column is
+ * unavailable — a memory is never lost because of RAG.
+ */
+async function saveMemory(
+  supabase: SupabaseClient,
+  petId: string,
+  category: string,
+  content: string,
+  importance: number,
+  dedup: boolean
+): Promise<void> {
+  const base = { pet_id: petId, category, content, importance };
+  let vectorLiteral: string | null = null;
+
+  try {
+    const vector = await embedText(content, 'RETRIEVAL_DOCUMENT');
+    vectorLiteral = toVectorLiteral(vector);
+
+    if (dedup) {
+      const { data, error } = await supabase.rpc('match_pet_memories', {
+        p_pet_id: petId,
+        p_query: vectorLiteral,
+        p_count: 1,
+      });
+      if (!error) {
+        const nearest = (data as Array<{ similarity: number }> | null)?.[0];
+        if (nearest && typeof nearest.similarity === 'number' && nearest.similarity > MEMORY_DEDUP_THRESHOLD) {
+          return; // the pet already knows this
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[PetChat] memory embedding failed:', err);
+  }
+
+  let { error } = await supabase
+    .from('bub_pet_memories')
+    .insert(vectorLiteral ? { ...base, embedding: vectorLiteral } : base);
+
+  if (error && vectorLiteral) {
+    // Vector column may not exist yet (migration not applied) — retry plain.
+    ({ error } = await supabase.from('bub_pet_memories').insert(base));
+  }
+  if (error) console.error('[PetChat] memory insert failed:', error);
 }
 
 const SPECIES_PERSONALITY: Record<string, string> = {
@@ -138,52 +304,83 @@ export async function POST(req: NextRequest) {
 
     const supabase = getSupabaseAdmin();
 
-    // Load memories from Supabase (top 20 by importance)
+    const queryText = typeof message === 'string' ? message.trim() : '';
+
+    // Embedding + the two vector RPCs run alongside the plain reads below,
+    // so recall costs one embedding round-trip, not a serial chain.
+    const recallPromise: Promise<{ memories: MemoryRow[]; chat: RecalledChatRow[] } | null> = petId
+      ? embedQuery(queryText).then((qe) => (qe ? recallByVector(supabase, petId, qe) : null))
+      : Promise.resolve(null);
+
+    const [recalled, importantMemories, chatWindow, profileContent, quests] = await Promise.all([
+      recallPromise,
+      // Fallback corpus — also the source of truth while embeddings are missing.
+      petId
+        ? supabase
+            .from('bub_pet_memories')
+            .select('content, category')
+            .eq('pet_id', petId)
+            .order('importance', { ascending: false })
+            .order('created_at', { ascending: false })
+            .limit(20)
+        : Promise.resolve({ data: null }),
+      petId
+        ? supabase
+            .from('bub_pet_chat_log')
+            .select('role, content, created_at')
+            .eq('pet_id', petId)
+            .order('created_at', { ascending: false })
+            .limit(CHAT_WINDOW)
+        : Promise.resolve({ data: null }),
+      petId ? loadProfile(supabase, petId) : Promise.resolve(''),
+      petId
+        ? supabase
+            .from('bub_pet_quests')
+            .select('title, emoji, progress')
+            .eq('pet_id', petId)
+            .eq('status', 'active')
+            .limit(5)
+        : Promise.resolve({ data: null }),
+    ]);
+
+    // The living diary — always injected whole when it exists.
+    const profileText = profileContent
+      ? `\nCO O VIKI VÍŠ (tvůj deníček — vždy aktuální):\n${profileContent}`
+      : '';
+
+    // Memories: semantic recall, or the previous top-20-by-importance behaviour.
+    const recalledMemories = recalled?.memories ?? [];
+    const fallbackMemories = (importantMemories.data as MemoryRow[] | null) ?? [];
     let memoriesText = '';
-    if (petId) {
-      const { data: memories } = await supabase
-        .from('bub_pet_memories')
-        .select('content, category')
-        .eq('pet_id', petId)
-        .order('importance', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(20);
-
-      if (memories && memories.length > 0) {
-        memoriesText = `\nTVOJE VZPOMÍNKY (co si pamatuješ):\n${memories.map((m: { content: string; category: string }) => `- [${m.category}] ${m.content}`).join('\n')}`;
-      }
+    if (recalledMemories.length > 0) {
+      memoriesText = `\nVZPOMÍNKY K TÉMATU (vybavily se ti právě teď):\n${recalledMemories.map((m) => `- [${m.category}] ${m.content}`).join('\n')}`;
+    } else if (fallbackMemories.length > 0) {
+      memoriesText = `\nTVOJE VZPOMÍNKY (co si pamatuješ):\n${fallbackMemories.map((m) => `- [${m.category}] ${m.content}`).join('\n')}`;
     }
 
-    // Load recent chat history (last 50 messages)
-    let chatHistoryText = '';
-    if (petId) {
-      const { data: chatLog } = await supabase
-        .from('bub_pet_chat_log')
-        .select('role, content')
-        .eq('pet_id', petId)
-        .order('created_at', { ascending: false })
-        .limit(50);
+    // Recent chat window (last 50) — unchanged, but we keep created_at to
+    // drop recalled messages that are already quoted verbatim below.
+    const windowRows = (chatWindow.data as Array<{ role: string; content: string; created_at: string | null }> | null) ?? [];
+    const orderedWindow = [...windowRows].reverse();
+    const oldestWindowTs = orderedWindow[0]?.created_at ? Date.parse(orderedWindow[0].created_at) : NaN;
+    const chatHistoryText = orderedWindow.length > 0
+      ? `\nPOSLEDNÍ KONVERZACE:\n${orderedWindow.map((m) => `${m.role === 'user' ? 'Viki' : petName}: ${m.content}`).join('\n')}`
+      : '';
 
-      if (chatLog && chatLog.length > 0) {
-        const reversed = chatLog.reverse();
-        chatHistoryText = `\nPOSLEDNÍ KONVERZACE:\n${reversed.map((m: { role: string; content: string }) => `${m.role === 'user' ? 'Viki' : petName}: ${m.content}`).join('\n')}`;
-      }
-    }
+    // Older conversations pulled in by similarity — only what the window misses.
+    const olderChat = (recalled?.chat ?? []).filter((row) => {
+      if (!Number.isFinite(oldestWindowTs)) return true;
+      const ts = Date.parse(row.created_at);
+      return Number.isFinite(ts) && ts < oldestWindowTs;
+    });
+    const recalledChatText = olderChat.length > 0
+      ? `\nSTARŠÍ ROZHOVORY, KTERÉ SE TI VYBAVILY:\n${olderChat.map((m) => `- (${shortCzechDate(m.created_at)}) ${m.role === 'user' ? 'Viki' : petName}: ${m.content}`).join('\n')}`
+      : '';
 
-    // Load active quests
-    let questsText = '';
-    if (petId) {
-      const { data: quests } = await supabase
-        .from('bub_pet_quests')
-        .select('title, emoji, progress')
-        .eq('pet_id', petId)
-        .eq('status', 'active')
-        .limit(5);
-
-      if (quests && quests.length > 0) {
-        questsText = `\nAKTIVNÍ ÚKOLY:\n${quests.map((q: { emoji: string; title: string; progress: number }) => `- ${q.emoji} ${q.title} (${Math.round(q.progress * 100)}%)`).join('\n')}`;
-      }
-    }
+    const questRows = (quests.data as Array<{ title: string; emoji: string; progress: number }> | null) ?? [];
+    const questsText = questRows.length > 0
+      ? `\nAKTIVNÍ ÚKOLY:\n${questRows.map((q) => `- ${q.emoji} ${q.title} (${Math.round(q.progress * 100)}%)`).join('\n')}`
+      : '';
 
     // Family context (custody calendar)
     const familyContext = getFamilyContext();
@@ -263,7 +460,9 @@ ${englishWordsLearned && englishWordsLearned.length > 0 ? `- Slova co Viki umí:
 STATY: Hlad ${hunger}%, Štěstí ${happiness}%, Energie ${energy}%, Čistota ${cleanliness}%
 
 ${skills ? `SKILLY: Síla ${skills.strength}, Moudrost ${skills.wisdom}, Charisma ${skills.charisma}, Kreativita ${skills.creativity}, Příroda ${skills.nature}` : ''}
+${profileText}
 ${memoriesText}
+${recalledChatText}
 ${chatHistoryText}
 ${questsText}
 ${gameModeSection}
@@ -335,23 +534,31 @@ Odpověz POUZE validním JSON:
 
     // Save to Supabase (async, don't block response)
     if (petId) {
-      // Save chat messages
-      supabase.from('bub_pet_chat_log').insert([
-        { pet_id: petId, role: 'user', content: message },
-        { pet_id: petId, role: 'pet', content: reply.reply, emotion: reply.emotion },
-      ]).then(() => {});
-
-      // Save memory if AI flagged something important
-      if (reply.remember) {
-        supabase.from('bub_pet_memories').insert({
-          pet_id: petId,
-          category: 'conversation',
-          content: reply.remember,
-          importance: 7,
-        }).then(() => {});
-      }
+      // Save chat messages — the request fires here (unchanged timing); after()
+      // only awaits it to learn the row ids. PostgrestBuilder is a PromiseLike.
+      const chatInsert: PromiseLike<InsertedChatRow[]> = supabase
+        .from('bub_pet_chat_log')
+        .insert([
+          { pet_id: petId, role: 'user', content: message },
+          { pet_id: petId, role: 'pet', content: reply.reply, emotion: reply.emotion },
+        ])
+        .select('id, role')
+        .then(
+          ({ data, error }) => {
+            if (error) {
+              console.error('[PetChat] chat log insert failed:', error);
+              return [];
+            }
+            return (data as InsertedChatRow[] | null) ?? [];
+          },
+          (err) => {
+            console.error('[PetChat] chat log insert failed:', err);
+            return [];
+          }
+        );
 
       // Update english level if AI assessed it
+      let englishWordMemory: string | null = null;
       if (reply.english_assessment && typeof reply.english_assessment === 'object') {
         const ea = reply.english_assessment as { level_change?: number; word_learned?: string };
         const updates: Record<string, unknown> = {};
@@ -367,12 +574,7 @@ Odpověz POUZE validním JSON:
             words.push(ea.word_learned);
             updates.english_words_learned = words;
           }
-          supabase.from('bub_pet_memories').insert({
-            pet_id: petId,
-            category: 'preference',
-            content: `Viki zná anglické slovo: "${ea.word_learned}"`,
-            importance: 5,
-          }).then(({ error }) => { if (error) console.error('Memory save failed:', error); });
+          englishWordMemory = `Viki zná anglické slovo: "${ea.word_learned}"`;
         }
 
         if (Object.keys(updates).length > 0) {
@@ -380,6 +582,25 @@ Odpověz POUZE validním JSON:
             .then(({ error }) => { if (error) console.error('English update failed:', error); });
         }
       }
+
+      // Everything embedding-related happens after the response is flushed.
+      after(async () => {
+        try {
+          const insertedRows = await chatInsert;
+          await Promise.all([
+            embedChatRows(supabase, insertedRows, queryText, reply.reply),
+            reply.remember
+              ? saveMemory(supabase, petId, 'conversation', reply.remember, 7, true)
+              : null,
+            englishWordMemory
+              ? saveMemory(supabase, petId, 'preference', englishWordMemory, 5, false)
+              : null,
+          ]);
+          await maybeConsolidateProfile(supabase, petId, typeof petName === 'string' ? petName : 'Mazlíček');
+        } catch (err) {
+          console.error('[PetChat] background memory work failed:', err);
+        }
+      });
     }
 
     return NextResponse.json({ success: true, ...reply });
