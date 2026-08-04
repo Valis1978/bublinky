@@ -1,295 +1,264 @@
 'use client';
 
-import { useState } from 'react';
-import { BottomNav } from '@/components/ui/BottomNav';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowLeft, Sparkles, BookOpen, Loader2, RotateCcw, Star } from 'lucide-react';
-import Link from 'next/link';
+// Příběhy — three rooms in one page:
+//   1) Nový příběh  · setup wizard → interactive reader
+//   2) Moje příběhy · stories Viki kept
+//   3) Polička      · books she met and wants to remember
+//
+// Research guardrails: reading is never scored here. No streaks, no counters,
+// no countdowns, no rewards — the only feedback is warmth.
 
-interface StoryData {
-  title: string;
-  story: string;
-  moral: string;
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react';
+import Link from 'next/link';
+import { motion } from 'framer-motion';
+import { ArrowLeft, BookOpen } from 'lucide-react';
+import { BottomNav } from '@/components/ui/BottomNav';
+import { loadPet, type PetSpecies, type PetStage } from '@/lib/pet-engine';
+import { rollCameo } from '@/lib/story-cameos';
+import type { SavedStory, StorySetup as StorySetupData } from '@/types/story';
+import { StorySetup } from '@/components/stories/StorySetup';
+import { StoryReader, type StoryRun } from '@/components/stories/StoryReader';
+import { StoryShelf } from '@/components/stories/StoryShelf';
+import { ReadingShelf } from '@/components/stories/ReadingShelf';
+import { readList } from '@/components/stories/shared';
+import { hapticTap } from '@/lib/haptics';
+
+const TABS = [
+  { id: 'new', label: 'Nový příběh', emoji: '✨' },
+  { id: 'mine', label: 'Moje příběhy', emoji: '📚' },
+  { id: 'shelf', label: 'Polička', emoji: '🌟' },
+] as const;
+
+type Tab = (typeof TABS)[number]['id'];
+
+const PLANNED_STEPS = 6;
+const SPECIES_IDS: PetSpecies[] = ['cat', 'dog', 'bunny', 'dragon', 'unicorn', 'fox'];
+
+interface Identity {
+  userId: string | null;
+  heroName: string;
+  petName: string;
+  petSpecies: PetSpecies;
+  petStage: PetStage;
 }
 
-const GENRES = [
-  { id: 'fantasy', emoji: '🧙‍♀️', label: 'Fantasy' },
-  { id: 'adventure', emoji: '🗺️', label: 'Dobrodružství' },
-  { id: 'detective', emoji: '🔍', label: 'Detektivka' },
-  { id: 'fairy-tale', emoji: '👸', label: 'Pohádka' },
-  { id: 'sci-fi', emoji: '🚀', label: 'Sci-fi' },
-  { id: 'animal', emoji: '🐾', label: 'Zvířecí' },
-  { id: 'funny', emoji: '😂', label: 'Vtipný' },
-  { id: 'scary-lite', emoji: '👻', label: 'Trochu strašidelný' },
-];
+const DEFAULT_IDENTITY: Identity = {
+  userId: null,
+  heroName: 'Viki',
+  petName: 'Bublík',
+  petSpecies: 'cat',
+  petStage: 'child',
+};
 
-const SETTINGS = [
-  { id: 'castle', emoji: '🏰', label: 'Hrad' },
-  { id: 'forest', emoji: '🌲', label: 'Enchanted les' },
-  { id: 'space', emoji: '🌌', label: 'Vesmír' },
-  { id: 'ocean', emoji: '🌊', label: 'Oceán' },
-  { id: 'school', emoji: '🏫', label: 'Kouzelnická škola' },
-  { id: 'city', emoji: '🌆', label: 'Město budoucnosti' },
-];
+function toSpecies(value: string | undefined): PetSpecies {
+  return SPECIES_IDS.includes(value as PetSpecies) ? (value as PetSpecies) : 'cat';
+}
 
-export default function StoriesPage() {
-  const [heroName, setHeroName] = useState('Viki');
-  const [genre, setGenre] = useState('');
-  const [setting, setSetting] = useState('');
-  const [extras, setExtras] = useState('');
-  const [story, setStory] = useState<StoryData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState('');
+/** Reads name + id from `bub_user`, pet from local pet state. Client only. */
+function readIdentity(): Identity {
+  const identity: Identity = { ...DEFAULT_IDENTITY };
+  try {
+    const raw = localStorage.getItem('bub_user');
+    const parsed = raw ? (JSON.parse(raw) as { id?: unknown; name?: unknown }) : null;
+    if (parsed && typeof parsed.id === 'string') identity.userId = parsed.id;
+    if (parsed && typeof parsed.name === 'string' && parsed.name.trim()) {
+      identity.heroName = parsed.name.trim();
+    }
+  } catch { /* corrupted localStorage — defaults are fine */ }
 
-  const generateStory = async () => {
-    if (!genre || !heroName.trim()) return;
-    setLoading(true);
-    setError('');
-    setStory(null);
+  const pet = loadPet();
+  if (pet) {
+    if (pet.name.trim()) identity.petName = pet.name.trim();
+    identity.petSpecies = toSpecies(pet.species);
+    // An egg cannot go adventuring — show the hatched look inside stories.
+    identity.petStage = pet.stage === 'egg' ? 'child' : pet.stage;
+  }
+  return identity;
+}
 
-    try {
-      const res = await fetch('/api/story', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          heroName: heroName.trim(),
-          genre: GENRES.find(g => g.id === genre)?.label || genre,
-          setting: SETTINGS.find(s => s.id === setting)?.label || setting || '',
-          extras: extras.trim(),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || 'Chyba');
-      setStory(data);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Něco se pokazilo');
-    } finally {
-      setLoading(false);
+// ── Identity as an external store ────────────────────────────────────────────
+// localStorage is outside React: reading it during render would break hydration,
+// reading it in an effect would cascade renders. useSyncExternalStore does both
+// right — the server/first paint gets the defaults, the client swaps in the
+// real names right after mount and whenever the tab regains focus.
+
+let identityCache: Identity | null = null;
+
+function sameIdentity(a: Identity, b: Identity): boolean {
+  return a.userId === b.userId && a.heroName === b.heroName
+    && a.petName === b.petName && a.petSpecies === b.petSpecies && a.petStage === b.petStage;
+}
+
+function identitySnapshot(): Identity {
+  if (!identityCache) identityCache = readIdentity();
+  return identityCache;
+}
+
+function serverIdentitySnapshot(): Identity {
+  return DEFAULT_IDENTITY;
+}
+
+function subscribeIdentity(onChange: () => void): () => void {
+  const refresh = () => {
+    const next = readIdentity();
+    if (!identityCache || !sameIdentity(identityCache, next)) {
+      identityCache = next;
+      onChange();
     }
   };
+  refresh(); // a client-side navigation may bring a fresher localStorage
+  window.addEventListener('focus', refresh);
+  window.addEventListener('storage', refresh);
+  return () => {
+    window.removeEventListener('focus', refresh);
+    window.removeEventListener('storage', refresh);
+  };
+}
+
+export default function StoriesPage() {
+  const [tab, setTab] = useState<Tab>('new');
+  const identity = useSyncExternalStore(subscribeIdentity, identitySnapshot, serverIdentitySnapshot);
+  const [recentCameoIds, setRecentCameoIds] = useState<string[]>([]);
+  const [run, setRun] = useState<StoryRun | null>(null);
+  const [storiesVersion, setStoriesVersion] = useState(0);
+  const [shelfVersion, setShelfVersion] = useState(0);
+  /** bumps only when a story was saved — refreshes the cameo history */
+  const [savedCount, setSavedCount] = useState(0);
+
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const scrollToTop = useCallback(() => {
+    scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
+
+  // Cameo history — so the same guest does not show up twice in a row.
+  useEffect(() => {
+    const { userId } = identity;
+    if (!userId) return;
+    let alive = true;
+    fetch(`/api/stories?userId=${encodeURIComponent(userId)}`)
+      .then(r => r.json())
+      .then((payload: unknown) => {
+        if (!alive) return;
+        const list = readList<SavedStory>(payload, 'stories');
+        const recent = [...list]
+          .sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''))
+          .slice(0, 3)
+          .map(s => s.cameoId)
+          .filter((id): id is string => typeof id === 'string' && id.length > 0);
+        setRecentCameoIds(recent);
+      })
+      .catch(() => { /* offline — roll from the full pool */ });
+    return () => { alive = false; };
+  }, [identity, savedCount]);
+
+  const switchTab = (next: Tab) => {
+    void hapticTap();
+    setTab(next);
+    if (next === 'mine') setStoriesVersion(v => v + 1);
+    if (next === 'shelf') setShelfVersion(v => v + 1);
+    scrollToTop();
+  };
+
+  const handleStart = useCallback((setup: StorySetupData) => {
+    const cameo = rollCameo(recentCameoIds);
+    setRun({
+      setup,
+      cameoId: cameo?.id ?? null,
+      // The guest walks in once the story is already rolling.
+      cameoStep: Math.random() < 0.5 ? 1 : 2,
+      plannedSteps: PLANNED_STEPS,
+    });
+    scrollToTop();
+  }, [recentCameoIds, scrollToTop]);
+
+  const closeRun = useCallback(() => { setRun(null); scrollToTop(); }, [scrollToTop]);
+
+  const startAnother = useCallback(() => {
+    setRun(null);
+    setTab('new');
+    scrollToTop();
+  }, [scrollToTop]);
 
   return (
     <div className="flex flex-col h-dvh">
-      <div className="flex-1 overflow-y-auto pb-nav safe-top">
+      <div ref={scrollRef} className="flex-1 overflow-y-auto px-4 pb-nav safe-top">
         {/* Header */}
-        <div
-          className="sticky top-0 z-10 px-4 py-3 flex items-center gap-3"
-          style={{
-            background: 'var(--bg-nav)',
-            backdropFilter: 'blur(20px)',
-            borderBottom: '1px solid var(--border)',
-          }}
-        >
-          <Link href="/" className="p-1" style={{ color: 'var(--text-muted)' }}>
+        <header className="flex items-center gap-1 -ml-2">
+          <Link
+            href="/home"
+            aria-label="Zpátky domů"
+            className="flex items-center justify-center"
+            style={{ width: 60, height: 60, color: 'var(--text-muted)', touchAction: 'manipulation' }}
+          >
             <ArrowLeft size={20} />
           </Link>
-          <div className="flex items-center gap-2">
-            <BookOpen size={18} style={{ color: 'var(--accent)' }} />
-            <h1 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Příběhy</h1>
-          </div>
-          {story && (
-            <button onClick={() => setStory(null)} className="ml-auto p-1" style={{ color: 'var(--text-muted)' }}>
-              <RotateCcw size={18} />
-            </button>
-          )}
-        </div>
+          <BookOpen size={19} style={{ color: 'var(--accent)' }} />
+          <h1 className="text-lg font-black" style={{ color: 'var(--text-primary)' }}>Příběhy</h1>
+        </header>
 
-        <div className="p-4 max-w-lg mx-auto">
-          {/* Setup */}
-          {!story && !loading && (
-            <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-              <div className="text-center space-y-2 py-2">
-                <div className="text-4xl">📖✨</div>
-                <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                  Vytvoř si příběh!
-                </h2>
-                <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                  AI napíše pohádku, kde jsi hlavní hrdinka
-                </p>
-              </div>
-
-              {/* Hero name */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                  👸 Jméno hrdinky
-                </label>
-                <input
-                  type="text"
-                  value={heroName}
-                  onChange={e => setHeroName(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl text-base"
-                  style={{ background: 'var(--bg-input)', color: 'var(--text-primary)', border: '2px solid var(--border)' }}
-                  maxLength={30}
-                />
-              </div>
-
-              {/* Genre */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                  🎭 Jaký příběh?
-                </label>
-                <div className="grid grid-cols-4 gap-2">
-                  {GENRES.map(g => (
-                    <motion.button
-                      key={g.id}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => setGenre(g.id)}
-                      className="flex flex-col items-center gap-1 py-3 rounded-xl transition-all"
-                      style={{
-                        background: genre === g.id ? 'var(--accent-soft)' : 'var(--bg-card)',
-                        border: genre === g.id ? '2px solid var(--accent)' : '2px solid transparent',
-                        boxShadow: 'var(--shadow)',
-                      }}
-                    >
-                      <span className="text-xl">{g.emoji}</span>
-                      <span className="text-[10px] font-medium" style={{ color: 'var(--text-primary)' }}>{g.label}</span>
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Setting */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                  🌍 Kde se odehrává? <span className="font-normal" style={{ color: 'var(--text-muted)' }}>(volitelné)</span>
-                </label>
-                <div className="grid grid-cols-3 gap-2">
-                  {SETTINGS.map(s => (
-                    <motion.button
-                      key={s.id}
-                      whileTap={{ scale: 0.95 }}
-                      onClick={() => setSetting(setting === s.id ? '' : s.id)}
-                      className="flex flex-col items-center gap-1 py-2.5 rounded-xl transition-all"
-                      style={{
-                        background: setting === s.id ? 'var(--accent-soft)' : 'var(--bg-card)',
-                        border: setting === s.id ? '2px solid var(--accent)' : '2px solid transparent',
-                        boxShadow: 'var(--shadow)',
-                      }}
-                    >
-                      <span className="text-lg">{s.emoji}</span>
-                      <span className="text-[10px] font-medium" style={{ color: 'var(--text-primary)' }}>{s.label}</span>
-                    </motion.button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Extras */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium" style={{ color: 'var(--text-primary)' }}>
-                  ✨ Speciální přání <span className="font-normal" style={{ color: 'var(--text-muted)' }}>(volitelné)</span>
-                </label>
-                <input
-                  type="text"
-                  value={extras}
-                  onChange={e => setExtras(e.target.value)}
-                  placeholder="Např. s drakem, s nejlepší kamarádkou..."
-                  className="w-full px-4 py-3 rounded-2xl text-sm"
-                  style={{ background: 'var(--bg-input)', color: 'var(--text-primary)', border: '2px solid var(--border)' }}
-                  maxLength={100}
-                />
-              </div>
-
-              {/* Generate button */}
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                onClick={generateStory}
-                disabled={!genre || !heroName.trim()}
-                className="w-full py-4 rounded-2xl text-white font-bold text-base flex items-center justify-center gap-2 disabled:opacity-30"
-                style={{ background: 'var(--accent)' }}
-              >
-                <Sparkles size={20} /> Vytvořit příběh
-              </motion.button>
-
-              {error && (
-                <div className="p-3 rounded-xl text-center text-sm" style={{ background: '#FEE2E2', color: '#DC2626' }}>
-                  {error}
-                </div>
-              )}
-            </motion.div>
-          )}
-
-          {/* Loading */}
-          {loading && (
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              className="flex flex-col items-center justify-center py-20 gap-4"
-            >
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-              >
-                <Loader2 size={40} style={{ color: 'var(--accent)' }} />
-              </motion.div>
-              <p className="font-medium" style={{ color: 'var(--text-primary)' }}>Píšu příběh o {heroName}...</p>
-              <p className="text-xs" style={{ color: 'var(--text-muted)' }}>AI pracuje na tvé pohádce ✨</p>
-            </motion.div>
-          )}
-
-          {/* Story display */}
-          {story && (
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="space-y-4"
-            >
-              {/* Title */}
-              <div className="text-center py-4">
-                <motion.div
-                  className="text-4xl mb-3"
-                  animate={{ scale: [1, 1.1, 1] }}
-                  transition={{ duration: 2, repeat: Infinity }}
+        {/* Pill tabs — hidden while a story is running */}
+        {!run && (
+          <div
+            className="grid grid-cols-3 gap-1 rounded-3xl p-1 mb-4"
+            style={{ background: 'var(--bg-secondary)' }}
+          >
+            {TABS.map(t => {
+              const active = tab === t.id;
+              return (
+                <button
+                  key={t.id}
+                  type="button"
+                  onClick={() => switchTab(t.id)}
+                  aria-pressed={active}
+                  className="relative flex flex-col items-center justify-center gap-0.5 rounded-3xl"
+                  style={{ minHeight: 60, touchAction: 'manipulation', background: 'transparent', border: 'none' }}
                 >
-                  📖
-                </motion.div>
-                <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
-                  {story.title}
-                </h2>
-              </div>
-
-              {/* Story text */}
-              <div
-                className="rounded-2xl p-5 space-y-4"
-                style={{ background: 'var(--bg-card)', boxShadow: 'var(--shadow)' }}
-              >
-                {story.story.split('\n').filter(Boolean).map((paragraph, i) => (
-                  <motion.p
-                    key={i}
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    transition={{ delay: i * 0.1 }}
-                    className="text-sm leading-relaxed"
-                    style={{ color: 'var(--text-primary)' }}
+                  {active && (
+                    <motion.span
+                      layoutId="stories-tab-pill"
+                      className="absolute inset-0 rounded-3xl"
+                      style={{ background: 'var(--bg-card)', boxShadow: 'var(--shadow)' }}
+                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                  <span className="relative text-[17px] leading-none" aria-hidden>{t.emoji}</span>
+                  <span
+                    className="relative text-[11px] font-bold"
+                    style={{ color: active ? 'var(--text-primary)' : 'var(--text-muted)' }}
                   >
-                    {paragraph}
-                  </motion.p>
-                ))}
-              </div>
+                    {t.label}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        )}
 
-              {/* Moral */}
-              <div
-                className="rounded-2xl p-4 flex items-start gap-3"
-                style={{ background: 'var(--accent-soft)' }}
-              >
-                <Star size={18} className="flex-shrink-0 mt-0.5" style={{ color: 'var(--accent)' }} />
-                <div>
-                  <p className="text-xs font-bold mb-1" style={{ color: 'var(--accent)' }}>Poučení</p>
-                  <p className="text-sm" style={{ color: 'var(--text-primary)' }}>{story.moral}</p>
-                </div>
-              </div>
-
-              {/* New story button */}
-              <motion.button
-                whileTap={{ scale: 0.97 }}
-                onClick={() => setStory(null)}
-                className="w-full py-3 rounded-2xl font-bold text-base flex items-center justify-center gap-2"
-                style={{ background: 'var(--bg-card)', color: 'var(--accent)', boxShadow: 'var(--shadow)' }}
-              >
-                <Sparkles size={18} /> Další příběh
-              </motion.button>
-            </motion.div>
-          )}
-        </div>
+        {/* Content */}
+        {run ? (
+          <StoryReader
+            run={run}
+            userId={identity.userId}
+            petSpecies={identity.petSpecies}
+            petStage={identity.petStage}
+            onNewStory={startAnother}
+            onClose={closeRun}
+            onSaved={() => { setStoriesVersion(v => v + 1); setSavedCount(c => c + 1); }}
+            scrollToTop={scrollToTop}
+          />
+        ) : tab === 'new' ? (
+          <StorySetup
+            heroName={identity.heroName}
+            petName={identity.petName}
+            petSpecies={identity.petSpecies}
+            petStage={identity.petStage}
+            onStart={handleStart}
+          />
+        ) : tab === 'mine' ? (
+          <StoryShelf userId={identity.userId} refreshKey={storiesVersion} scrollToTop={scrollToTop} />
+        ) : (
+          <ReadingShelf userId={identity.userId} refreshKey={shelfVersion} />
+        )}
       </div>
 
       <BottomNav />
