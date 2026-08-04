@@ -85,6 +85,16 @@ export const DAILY_ENTRIES: DailyEntry[] = [
   { id: 'c14', kind: 'challenge', text: 'Dnešní mise: zkus stát na jedné noze a počítej, jak dlouho to vydržíš! 🦩' },
   { id: 'c15', kind: 'challenge', text: 'Dnešní mise: řekni mi tři věci, za které jsi dneska vděčná. Jsem vděčný/á za tebe! 🌟' },
 
+  // Feelings & friendships — gentle skills for an almost-11-year-old (never preachy)
+  { id: 'c16', kind: 'challenge', text: 'Dnešní mise: vzpomeň si na jednu věc, co tě dnes potěšila, a jednu, co tě štvala. Obojí je úplně fér cítit — schválně, povíš mi je? 💜' },
+  { id: 'c17', kind: 'challenge', text: 'Dnešní mise: až se příště s někým nepohodneš, zkus místo mlčení říct „tohle mi vadilo". Já to zkusím taky — je to těžší, než to zní! 💪' },
+  { id: 'c18', kind: 'challenge', text: 'Dnešní mise: napiš nebo řekni jedné kamarádce, co se ti na ní líbí. Uvidíš, co to udělá. ✨' },
+  { id: 'f23', kind: 'fact', text: 'Vědci zjistili, že kamarádství nejvíc rostou ze společných zážitků — i z úplně obyčejných, jako je cesta ze školy. 🚶‍♀️' },
+  { id: 'f24', kind: 'fact', text: 'Když pocit pojmenuješ nahlas („jsem naštvaná", „je mi smutno"), mozek se doopravdy trochu uklidní. Funguje to i šeptem. 🧠' },
+  { id: 'f25', kind: 'fact', text: 'Hádka kamarádství nemusí zbořit — páry kamarádek, které se umí usmířit, bývají nakonec nejpevnější. 🤝' },
+  { id: 'j21', kind: 'joke', text: 'Víš, co si řekly dvě ponožky po hádce? „Zase k sobě patříme — jinak nás sní lichožrout!" 🧦' },
+  { id: 'c19', kind: 'challenge', text: 'Dnešní mise: zkus si dnes všimnout, co asi cítí někdo jiný — třeba spolužačka, co je potichu. Nemusíš nic dělat, jen si všimnout. 👀' },
+
   // English words — barvy, zvířata, pocity, počasí, jednoduché fráze
   { id: 'e03', kind: 'english', text: 'Modrá anglicky se řekne blue! To znamená modrá – stejná barva jako obloha. 🎈', english: { word: 'blue', meaning: 'modrá' } },
   { id: 'e04', kind: 'english', text: 'Zelená anglicky se řekne green! To znamená zelená – stejná barva jako tráva. 🎈', english: { word: 'green', meaning: 'zelená' } },

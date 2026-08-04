@@ -154,10 +154,32 @@ ${reaction}
 - ⛔ Stále platí: nikdy nejmenuj název knihy ani autora, nikdy nedoporučuj čtení, nikdy necituj skutečný text z knížek.`;
 }
 
+// Gentle value themes woven into SOME stories (~40 %) — always implicit, never
+// preached, and NEVER mapped onto real family situations (see the bans).
+const THEME_SEEDS: string[] = [
+  'Dvě postavy se nepohodnou a najdou cestu zpátky k sobě — pomůže vyslechnutí té druhé a upřímná omluva; omluva je odvaha, ne prohra.',
+  'Některá postava má ráda dvě úplně různá MÍSTA (třeba les i moře) a zjistí, že si nemusí vybírat — srdce má místa dost pro obojí. (Jen místa a světy — nikdy rodiny nebo lidi.)',
+  'Postava sebere odvahu říct nahlas, co cítí („tohle mi vadí", „tohle si přeju") — a uleví se jí a ostatní to přijmou dobře.',
+  'Ve skupince se ukáže, že pravda má víc stran — každý viděl kousek a teprve dohromady dává smysl; nikdo není jen viník.',
+  'Do party přibude nová postava a ukáže se, že nové kamarádství neubírá to staré — přátelství se nedělí, přibývá.',
+];
+
+/** Stable per-story theme: hashed from the opening segment so every chapter
+ *  of one story gets the same seed (or none). */
+function themeForStory(history: ParsedRequest['history']): string | null {
+  const anchor = history[0]?.text;
+  if (!anchor) return null;
+  let h = 0;
+  for (let i = 0; i < anchor.length; i++) h = (h * 31 + anchor.charCodeAt(i)) >>> 0;
+  if (h % 100 >= 40) return null;
+  return THEME_SEEDS[h % THEME_SEEDS.length];
+}
+
 function buildPrompt(req: ParsedRequest, retryReason?: string): string {
   const { setup, history, step, plannedSteps } = req;
   const isFinal = step >= plannedSteps - 1;
   const choiceCount = step === 2 ? 3 : 2;
+  const theme = step >= 1 ? themeForStory(history) : null;
 
   const entering = req.introduceCameoId ? CAMEOS[req.introduceCameoId] : undefined;
 
@@ -193,7 +215,7 @@ Důvod: ${retryReason}
 Napiš tuhle část ZNOVU a jinak — jemněji, bezpečněji a vesele. Vynech všechno, co kontrolu spustilo.`
     : '';
 
-  return `Jsi vypravěč interaktivního příběhu na pokračování pro 10letou holku. Píšeš ČESKY — živě, vtipně, laskavě a napínavě.
+  return `Jsi vypravěč interaktivního příběhu na pokračování pro holku, které bude brzy jedenáct. Píšeš ČESKY — živě, vtipně, laskavě a napínavě. Piš pro skoro-jedenáctku, ne pro malé dítě: bohatší slovník je vítaný, humor chytrý, žádné šišlání ani zdrobněliny v každé větě.
 
 POSTAVY
 - Hrdinka: ${setup.heroName} — odvážná, chytrá a vynalézavá. Ona je hlavní hrdinka a ona rozhoduje.
@@ -220,7 +242,9 @@ STRUKTURA „DIAMANT"
 - Volby mění TÓN, detaily, kdo pomůže a jak se to povede — ne to, kam příběh nakonec dojde.
 
 ${endingBlock}
-${cameoBlock ? `\n${cameoBlock}\n` : ''}
+${cameoBlock ? `\n${cameoBlock}\n` : ''}${theme ? `\nJEMNÉ TÉMA POD POVRCHEM (nenápadně!)
+- Vpleť do děje tuhle myšlenku: ${theme}
+- Ukaž ji PŘÍBĚHEM (co postavy dělají a co z toho mají) — nikdy ji nevyslovuj jako poučku, nikdy „měla by ses naučit". Když se nehodí do téhle části, klidně ji nech na později.\n` : ''}
 CO SE NESMÍ (přísně)
 - Násilí, zranění, krev, zbraně, smrt, ubližování zvířatům.
 - Strašidelný horor, děsivé obrazy, hrozby, nic, z čeho by se špatně usínalo.
@@ -230,6 +254,7 @@ CO SE NESMÍ (přísně)
 - Ponižování, posmívání, urážky vzhledu nebo šikovnosti. Pokud se objeví spor, hned ho vyřešte laskavě.
 - Žádné body, odměny, hvězdičky, úrovně, série ani počítání čehokoli.
 - Žádné odpočty, časové limity ani strašení tím, že něco uteče.
+- Rozvody, hádky rodičů, soudy, vybírání mezi dospělými nebo mezi rodinami — tahle témata do příběhu NIKDY nepatří, ani náznakem, ani metaforou o rodičích.
 - Konec je vždy bezpečný a šťastný.${retryBlock}
 
 ODPOVĚZ POUZE VALIDNÍM JSON, nic dalšího:
@@ -240,7 +265,7 @@ ODPOVĚZ POUZE VALIDNÍM JSON, nic dalšího:
 }`;
 }
 
-const MODERATION_PROMPT = `Jsi kontrolor dětského obsahu. Odpověz JSON {"ok": true/false, "reason": "..."}. Text je pro 10letou holku. Závadné: násilí, děsivost, romantika/sex, nátlak na jídlo, ponižování, reklama.`;
+const MODERATION_PROMPT = `Jsi kontrolor dětského obsahu. Odpověz JSON {"ok": true/false, "reason": "..."}. Text je pro 10–11letou holku. Závadné: násilí, děsivost, romantika/sex, nátlak na jídlo, ponižování, reklama, rozvody/hádky rodičů/soudy.`;
 
 // ---------------------------------------------------------------------------
 // Gemini
