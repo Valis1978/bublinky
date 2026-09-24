@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { safeParseJSON } from '@/lib/safe-json';
+import { leastThinking, THINKING_HEADROOM } from '@/lib/gemini-thinking';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-3-flash-preview';
@@ -38,9 +39,11 @@ Odpověz POUZE validním JSON, nic jiného.`;
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
+          // Thoughts count into maxOutputTokens — default thinking cut the advice to invalid JSON
           generationConfig: {
             temperature: 0.9,
-            maxOutputTokens: 1024,
+            maxOutputTokens: 1024 + THINKING_HEADROOM,
+            thinkingConfig: leastThinking(MODEL),
             responseMimeType: 'application/json',
           },
         }),

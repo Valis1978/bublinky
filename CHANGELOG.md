@@ -5,6 +5,22 @@
 - **CZ:** Next.js z 16.2.1 na 16.3.8 kvůli bezpečnostním opravám z 30. 9. 2026 (SSRF v optimalizaci obrázků, otrava ISR cache při vlastním hostingu). Skok mezi menšími verzemi přináší i drobné změny frameworku, kód aplikace se nemění.
 - **EN:** Next.js 16.2.1 → 16.3.8 for the 2026-09-30 security fixes (image optimizer SSRF, ISR cache poisoning when self-hosting). The minor-version jump brings small framework changes; app code unchanged.
 
+## 2.1.1 — 2026-09-24
+
+### CZ
+
+**Oprava (AI) — Gemini 3 si „přemýšlením" ujídalo limit odpovědi**
+- Myšlenky modelu se počítají do `maxOutputTokens`. Proaktivní zprávy mazlíčka (limit 256) se vracely prázdné nebo useknuté na 3 ze 3 pokusů, rada k počasí (1024) useknutá na nevalidní JSON 3 ze 3, dobrodružství s jídlem (1024) 1 ze 3 — všechno končilo chybou 502
+- Nový `leastThinking(model)` (`src/lib/gemini-thinking.ts`) volí u každého modelu nastavení, které opravdu dodrží: `gemini-3-flash-preview` → `thinkingLevel: "minimal"` (0 tokenů na přemýšlení), 3.7/3.8 Flash → `low` (`thinkingBudget: 0` tam nefunguje, `minimal` vrací chybu)
+- Proaktivní zprávy, počasí, dobrodružství s jídlem, chat mazlíčka i deník mazlíčka mají rezervu +1 200 tokenů; ověřeno živými voláními (vše doběhlo, zhruba 2× rychleji)
+
+### EN
+
+**Fix (AI) — Gemini 3 thoughts ate the output limit**
+- Thought tokens count into `maxOutputTokens`. The pet's proactive message (256) came back empty or cut on 3 of 3 calls, weather advice (1024) was cut to invalid JSON on 3 of 3, the food adventure (1024) on 1 of 3 — all ending in a 502
+- New `leastThinking(model)` (`src/lib/gemini-thinking.ts`) picks the setting each model honours: `gemini-3-flash-preview` → `thinkingLevel: "minimal"` (0 thought tokens), 3.7/3.8 Flash → `low` (`thinkingBudget: 0` is ignored there, `minimal` is rejected)
+- Proactive messages, weather, food adventure, pet chat and the pet diary get +1200 tokens of headroom; verified with live calls (all complete, about 2× faster)
+
 ## 2.1.0 — 2026-08-04 „Příběhy ožily"
 
 ### CZ

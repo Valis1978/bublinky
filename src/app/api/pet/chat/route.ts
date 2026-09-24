@@ -2,6 +2,7 @@ import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getFamilyContext } from '@/lib/custody-calendar';
 import { safeParseJSON } from '@/lib/safe-json';
+import { leastThinking, THINKING_HEADROOM } from '@/lib/gemini-thinking';
 import { CHAT_GAMES, RIDDLES, type ChatGameMode, type ChatGameDef, type Riddle } from '@/lib/chat-games';
 import { embedText, toVectorLiteral } from '@/lib/server/embeddings';
 import { maybeConsolidateProfile } from '@/lib/server/pet-profile';
@@ -504,10 +505,11 @@ Odpověz POUZE validním JSON:
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
             temperature: 1.0,
-            // Gemini 3 spends "thinking" tokens from this budget — without
-            // thinkingBudget: 0 longer replies get truncated to invalid JSON.
-            maxOutputTokens: 2048,
-            thinkingConfig: { thinkingBudget: 0 },
+            // Gemini 3 spends "thinking" tokens from this budget — without a
+            // thinking floor longer replies get truncated to invalid JSON, and
+            // thinkingBudget: 0 is ignored by 3.7/3.8 (see gemini-thinking.ts).
+            maxOutputTokens: 2048 + THINKING_HEADROOM,
+            thinkingConfig: leastThinking(MODEL),
             responseMimeType: 'application/json',
           },
         }),

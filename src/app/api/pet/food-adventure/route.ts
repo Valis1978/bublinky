@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getNextFoodToTry } from '@/lib/food-catalog';
 import { safeParseJSON } from '@/lib/safe-json';
+import { leastThinking, THINKING_HEADROOM } from '@/lib/gemini-thinking';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-3-flash-preview';
@@ -71,7 +72,13 @@ Odpověz POUZE validním JSON:
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature: 0.9, maxOutputTokens: 1024, responseMimeType: 'application/json' },
+          // Thoughts count into maxOutputTokens — without a floor the story was cut to invalid JSON
+          generationConfig: {
+            temperature: 0.9,
+            maxOutputTokens: 1024 + THINKING_HEADROOM,
+            thinkingConfig: leastThinking(MODEL),
+            responseMimeType: 'application/json',
+          },
         }),
       }
     );
