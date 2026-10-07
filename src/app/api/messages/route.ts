@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { chatService, REACTION_EMOJIS } from '@/services/chat.service';
 import { createClient } from '@supabase/supabase-js';
 import type { MessageType } from '@/types/database';
+import { SERVER_META_KEYS, previewOf, type ChatMeta } from '@/lib/chat-meta';
 
 function getSupabaseAdmin() {
   return createClient(
@@ -40,11 +41,12 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { content, type = 'text', media_url, media_metadata } = body as {
+    const { content, type = 'text', media_url, media_metadata, reply_to_id } = body as {
       content?: string;
       type?: MessageType;
       media_url?: string;
       media_metadata?: Record<string, unknown>;
+      reply_to_id?: string;
     };
 
     if (!content && !media_url) {
@@ -54,12 +56,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Reply/edit/delete markers are server-owned; never trust them from the client
+    const meta: ChatMeta = { ...(media_metadata ?? {}) };
+    for (const key of SERVER_META_KEYS) delete meta[key];
+
+    if (reply_to_id && typeof reply_to_id === 'string') {
+      const { data: quoted } = await getSupabaseAdmin()
+        .from('bub_messages')
+        .select('id, sender_id, type, content, media_metadata')
+        .eq('id', reply_to_id)
+        .maybeSingle();
+      if (quoted && !(quoted.media_metadata as ChatMeta | null)?.deleted_at) {
+        meta.reply_to = {
+          id: quoted.id,
+          sender_id: quoted.sender_id,
+          type: quoted.type,
+          preview: previewOf(quoted),
+        };
+      }
+    }
+
     const { data, error } = await chatService.sendMessage(
       userId,
       content || null,
       type,
       media_url,
-      media_metadata
+      Object.keys(meta).length > 0 ? meta : undefined
     );
 
     if (error) {

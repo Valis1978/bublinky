@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useRef, type FormEvent } from 'react';
+import { useState, useRef, useLayoutEffect, type FormEvent, type KeyboardEvent } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Send, Image as ImageIcon, Video, Mic, Sticker as StickerIcon } from 'lucide-react';
+import { Send, Image as ImageIcon, Video, Mic, Sticker as StickerIcon, Reply, Pencil, X, Check } from 'lucide-react';
 import { useVoiceRecorder } from '@/hooks/useVoiceRecorder';
 import { loadPet } from '@/lib/pet-engine';
 import { stickerFile, STICKERS } from '@/lib/sticker-catalog';
@@ -14,7 +14,17 @@ interface MessageInputProps {
   onVoice?: (blob: Blob) => void;
   onSticker?: (stickerId: string) => void;
   disabled?: boolean;
+  /** Quoted message shown above the field while replying */
+  replyTo?: { name: string; preview: string } | null;
+  onCancelReply?: () => void;
+  /** Set while editing an own message — the field starts with its text */
+  editing?: boolean;
+  initialText?: string;
+  onCancelEdit?: () => void;
+  onTyping?: () => void;
 }
+
+const MAX_ROWS_PX = 120;
 
 function formatDuration(seconds: number): string {
   const m = Math.floor(seconds / 60);
@@ -22,8 +32,20 @@ function formatDuration(seconds: number): string {
   return `${m}:${s.toString().padStart(2, '0')}`;
 }
 
-export function MessageInput({ onSend, onPhoto, onVideo, onVoice, onSticker, disabled }: MessageInputProps) {
-  const [text, setText] = useState('');
+export function MessageInput({
+  onSend, onPhoto, onVideo, onVoice, onSticker, disabled,
+  replyTo, onCancelReply, editing, initialText = '', onCancelEdit, onTyping,
+}: MessageInputProps) {
+  const [text, setText] = useState(initialText);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Grow with the text up to ~5 lines, then scroll inside
+  useLayoutEffect(() => {
+    const el = textareaRef.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, MAX_ROWS_PX)}px`;
+  }, [text]);
   const [stickerSheetOpen, setStickerSheetOpen] = useState(false);
   const [ownedStickers, setOwnedStickers] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -36,6 +58,15 @@ export function MessageInput({ onSend, onPhoto, onVideo, onVoice, onSticker, dis
     if (!trimmed) return;
     onSend(trimmed);
     setText('');
+    textareaRef.current?.focus();
+  };
+
+  // Phones insert a newline on Return (like WhatsApp); a hardware keyboard sends
+  const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (e.key !== 'Enter' || e.shiftKey || e.nativeEvent.isComposing) return;
+    if (window.matchMedia('(pointer: coarse)').matches) return;
+    e.preventDefault();
+    handleSubmit(e as unknown as FormEvent);
   };
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -193,15 +224,56 @@ export function MessageInput({ onSend, onPhoto, onVideo, onVoice, onSticker, dis
         )}
       </AnimatePresence>
 
-    <form
-      onSubmit={handleSubmit}
-      className="flex items-end gap-2 p-3 safe-bottom"
+    <div
       style={{
         background: 'var(--bg-nav)',
         backdropFilter: 'blur(20px)',
         borderTop: '1px solid var(--border)',
       }}
     >
+      {/* Reply / edit context bar */}
+      <AnimatePresence initial={false}>
+        {(replyTo || editing) && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="overflow-hidden"
+          >
+            <div className="flex items-center gap-2 px-4 pt-2.5">
+              <div className="flex-shrink-0" style={{ color: 'var(--accent)' }}>
+                {editing ? <Pencil size={18} /> : <Reply size={18} />}
+              </div>
+              <div
+                className="flex-1 min-w-0 pl-2.5"
+                style={{ borderLeft: '3px solid var(--accent)' }}
+              >
+                <p className="text-xs font-bold" style={{ color: 'var(--accent)' }}>
+                  {editing ? 'Úprava zprávy' : `Odpověď pro ${replyTo!.name}`}
+                </p>
+                <p className="text-[13px] truncate" style={{ color: 'var(--text-muted)' }}>
+                  {editing ? initialText : replyTo!.preview}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={editing ? onCancelEdit : onCancelReply}
+                className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center"
+                style={{ background: 'var(--bg-secondary)', color: 'var(--text-muted)' }}
+                aria-label="Zrušit"
+              >
+                <X size={16} />
+              </button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+    <form
+      onSubmit={handleSubmit}
+      className="flex items-end gap-2 p-3 safe-bottom"
+    >
+      {!editing && (<>
       {/* Photo/Gallery button — opens iOS photo picker (gallery + camera) */}
       <button
         type="button"
@@ -246,6 +318,7 @@ export function MessageInput({ onSend, onPhoto, onVideo, onVoice, onSticker, dis
       >
         <StickerIcon size={20} />
       </button>
+      </>)}
 
       {/* Text input */}
       <div
@@ -255,27 +328,33 @@ export function MessageInput({ onSend, onPhoto, onVideo, onVoice, onSticker, dis
           border: '1px solid var(--border)',
         }}
       >
-        <input
-          type="text"
+        <textarea
+          ref={textareaRef}
+          rows={1}
           value={text}
-          onChange={(e) => setText(e.target.value)}
+          onChange={(e) => {
+            setText(e.target.value);
+            if (e.target.value) onTyping?.();
+          }}
+          onKeyDown={handleKeyDown}
           placeholder="Napiš zprávu..."
           disabled={disabled}
-          className="w-full bg-transparent outline-none text-[15px]"
-          style={{ color: 'var(--text-primary)' }}
+          autoFocus={editing}
+          className="w-full bg-transparent outline-none text-[15px] resize-none block leading-snug"
+          style={{ color: 'var(--text-primary)', maxHeight: MAX_ROWS_PX }}
         />
       </div>
 
       {/* Voice / Send button */}
-      {hasContent ? (
+      {hasContent || editing ? (
         <motion.button
           type="submit"
-          disabled={disabled}
+          disabled={disabled || !hasContent}
           whileTap={{ scale: 0.9 }}
           className="flex-shrink-0 w-10 h-10 rounded-full flex items-center justify-center transition-all"
           style={{ background: 'var(--accent-gradient)' }}
         >
-          <Send size={18} className="text-white ml-0.5" />
+          {editing ? <Check size={20} className="text-white" /> : <Send size={18} className="text-white ml-0.5" />}
         </motion.button>
       ) : (
         <motion.button
@@ -289,6 +368,7 @@ export function MessageInput({ onSend, onPhoto, onVideo, onVoice, onSticker, dis
         </motion.button>
       )}
     </form>
+    </div>
     </>
   );
 }
