@@ -5,7 +5,10 @@ export async function GET(req: NextRequest) {
   const role = req.nextUrl.searchParams.get('role');
 
   const supabase = createAdminClient();
-  let query = supabase.from('bub_users').select('id, name, role');
+  let query = supabase
+    .from('bub_users')
+    .select('id, name, role, avatar_url, last_seen_at')
+    .order('created_at', { ascending: true });
 
   if (role) {
     query = query.eq('role', role);
