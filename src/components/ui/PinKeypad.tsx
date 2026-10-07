@@ -2,7 +2,8 @@
 
 import { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Delete, Check } from 'lucide-react';
+import { Delete } from 'lucide-react';
+import { hapticTap } from '@/lib/haptics';
 
 interface PinKeypadProps {
   onSubmit: (pin: string) => void;
@@ -17,6 +18,7 @@ export function PinKeypad({ onSubmit, loading, error, maxLength = 4 }: PinKeypad
   const addDigit = useCallback(
     (digit: string) => {
       if (pin.length < maxLength) {
+        void hapticTap();
         const newPin = pin + digit;
         setPin(newPin);
         if (newPin.length === maxLength) {
@@ -28,6 +30,7 @@ export function PinKeypad({ onSubmit, loading, error, maxLength = 4 }: PinKeypad
   );
 
   const deleteDigit = useCallback(() => {
+    void hapticTap();
     setPin((prev) => prev.slice(0, -1));
   }, []);
 

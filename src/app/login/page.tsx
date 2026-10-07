@@ -5,6 +5,9 @@ import { useAuth } from '@/hooks/useAuth';
 import { PinKeypad } from '@/components/ui/PinKeypad';
 import { useTheme } from '@/components/providers/ThemeProvider';
 import { Heart, Shield } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { FloatingBubbles } from '@/components/ui/FloatingBubbles';
+import { hapticSuccess, hapticTap, hapticWarn } from '@/lib/haptics';
 import type { UserRole } from '@/types/database';
 
 export default function LoginPage() {
@@ -22,10 +25,12 @@ export default function LoginPage() {
     const result = await login(pin, selectedRole);
 
     if (result.success) {
+      void hapticSuccess();
       setTheme(selectedRole === 'parent' ? 'tata' : 'viki');
       // Root routes by role: Viki → Domeček (joke of the day first), táta → chat
       window.location.href = '/';
     } else {
+      void hapticWarn();
       setError(result.error || 'Nesprávný PIN');
       setLoading(false);
     }
@@ -37,7 +42,13 @@ export default function LoginPage() {
         className="min-h-dvh flex flex-col items-center justify-center p-6"
         style={{ background: 'var(--bg-primary)' }}
       >
-        <div className="flex flex-col items-center gap-8 w-full max-w-sm">
+        <FloatingBubbles />
+        <motion.div
+          className="relative flex flex-col items-center gap-8 w-full max-w-sm"
+          initial={{ opacity: 0, y: 24 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: 'spring', stiffness: 260, damping: 24 }}
+        >
           <button
             onClick={() => {
               setSelectedRole(null);
@@ -62,7 +73,7 @@ export default function LoginPage() {
           </div>
 
           <PinKeypad onSubmit={handleSubmit} loading={loading} error={error} />
-        </div>
+        </motion.div>
       </div>
     );
   }
@@ -72,9 +83,15 @@ export default function LoginPage() {
       className="min-h-dvh flex flex-col items-center justify-center p-6"
       style={{ background: 'var(--bg-primary)' }}
     >
-      <div className="flex flex-col items-center gap-10 w-full max-w-sm">
+      <FloatingBubbles />
+      <div className="relative flex flex-col items-center gap-10 w-full max-w-sm">
         {/* Logo */}
-        <div className="text-center">
+        <motion.div
+          className="text-center"
+          initial={{ opacity: 0, scale: 0.6 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ type: 'spring', stiffness: 220, damping: 14 }}
+        >
           <h1
             className="text-5xl font-extrabold mb-2"
             style={{
@@ -88,17 +105,21 @@ export default function LoginPage() {
           <p className="text-sm" style={{ color: 'var(--text-muted)' }}>
             Kdo jsi?
           </p>
-        </div>
+        </motion.div>
 
         {/* Role buttons */}
         <div className="flex flex-col gap-4 w-full">
-          <button
+          <motion.button
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 22, delay: 0.15 }}
+            whileTap={{ scale: 0.96 }}
             onClick={() => {
+              void hapticTap();
               setSelectedRole('child');
               setTheme('viki');
             }}
-            className="w-full p-6 rounded-3xl flex items-center gap-4 transition-transform
-              hover:scale-[1.02] active:scale-[0.98]"
+            className="w-full p-6 rounded-3xl flex items-center gap-4 "
             style={{
               background: 'linear-gradient(135deg, #FFF0F5, #F5F3FF)',
               border: '2px solid rgba(249, 168, 212, 0.3)',
@@ -115,15 +136,19 @@ export default function LoginPage() {
               <p className="text-lg font-bold text-gray-800">Jsem Viki</p>
               <p className="text-sm text-gray-500">Ahoj!</p>
             </div>
-          </button>
+          </motion.button>
 
-          <button
+          <motion.button
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 22, delay: 0.25 }}
+            whileTap={{ scale: 0.96 }}
             onClick={() => {
+              void hapticTap();
               setSelectedRole('parent');
               setTheme('tata');
             }}
-            className="w-full p-6 rounded-3xl flex items-center gap-4 transition-transform
-              hover:scale-[1.02] active:scale-[0.98]"
+            className="w-full p-6 rounded-3xl flex items-center gap-4 "
             style={{
               background: 'linear-gradient(135deg, #1E293B, #0F172A)',
               border: '2px solid rgba(59, 130, 246, 0.3)',
@@ -140,7 +165,7 @@ export default function LoginPage() {
               <p className="text-lg font-bold text-slate-200">Jsem Táta</p>
               <p className="text-sm text-slate-400">Vstup</p>
             </div>
-          </button>
+          </motion.button>
         </div>
       </div>
     </div>
