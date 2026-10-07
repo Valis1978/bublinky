@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { CAMEOS, type CameoDef } from '@/lib/story-cameos';
 import { safeParseJSON } from '@/lib/safe-json';
+import { sampling } from '@/lib/gemini-thinking';
 import type { StoryChoice, StorySegment, StorySetup, StoryStepResponse } from '@/types/story';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
@@ -305,7 +306,7 @@ async function callGemini(prompt: string, temperature: number, maxOutputTokens: 
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { temperature, maxOutputTokens, responseMimeType: 'application/json' },
+          generationConfig: { ...sampling(MODEL, { temperature }), maxOutputTokens, responseMimeType: 'application/json' },
         }),
         signal: controller.signal,
       }

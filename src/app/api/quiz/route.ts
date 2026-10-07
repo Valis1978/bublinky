@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { sampling } from '@/lib/gemini-thinking';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-3-flash-preview';
@@ -62,7 +63,7 @@ Pravidla:
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
           generationConfig: {
-            temperature: 0.7,
+            ...sampling(MODEL, { temperature: 0.7 }),
             maxOutputTokens: 65536,
             responseMimeType: 'application/json',
           },

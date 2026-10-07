@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getFamilyContext, getCustodyInfo, getDogNickname } from '@/lib/custody-calendar';
 import { safeParseJSON } from '@/lib/safe-json';
-import { leastThinking, THINKING_HEADROOM } from '@/lib/gemini-thinking';
+import { leastThinking, sampling, THINKING_HEADROOM } from '@/lib/gemini-thinking';
 
 const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-3-flash-preview';
@@ -117,7 +117,7 @@ Odpověz POUZE validním JSON:
           contents: [{ parts: [{ text: prompt }] }],
           // Thoughts count into maxOutputTokens: with 256 and default thinking the message came back empty
           generationConfig: {
-            temperature: 1.1,
+            ...sampling(MODEL, { temperature: 1.1 }),
             maxOutputTokens: 256 + THINKING_HEADROOM,
             thinkingConfig: leastThinking(MODEL),
             responseMimeType: 'application/json',

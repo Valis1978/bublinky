@@ -5,7 +5,7 @@
 
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { safeParseJSON } from '@/lib/safe-json';
-import { leastThinking, THINKING_HEADROOM } from '@/lib/gemini-thinking';
+import { leastThinking, sampling, THINKING_HEADROOM } from '@/lib/gemini-thinking';
 
 const MODEL = 'gemini-3-flash-preview';
 const REQUEST_TIMEOUT_MS = 15000;
@@ -97,7 +97,7 @@ export async function maybeConsolidateProfile(
         body: JSON.stringify({
           contents: [{ parts: [{ text: buildPrompt(petName, previousProfile, transcript) }] }],
           generationConfig: {
-            temperature: 0.3,
+            ...sampling(MODEL, { temperature: 0.3 }),
             // Gemini 3 spends "thinking" tokens from this budget — without a
             // thinking floor the diary gets truncated to invalid JSON, and
             // thinkingBudget: 0 is ignored by 3.7/3.8 (see gemini-thinking.ts).

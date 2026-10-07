@@ -5,6 +5,11 @@
 - **CZ:** Next.js z 16.2.1 na 16.3.8 kvůli bezpečnostním opravám z 30. 9. 2026 (SSRF v optimalizaci obrázků, otrava ISR cache při vlastním hostingu). Skok mezi menšími verzemi přináší i drobné změny frameworku, kód aplikace se nemění.
 - **EN:** Next.js 16.2.1 → 16.3.8 for the 2026-09-30 security fixes (image optimizer SSRF, ISR cache poisoning when self-hosting). The minor-version jump brings small framework changes; app code unchanged.
 
+### 2026-10-07 — Gemini: parametry podle modelu / per-model request parameters
+
+- **CZ:** Google (oznámení 7. 10. 2026) odmítne `thinkingBudget` u připravovaných modelů a `temperature`/`topP`/`topK` jsou od `gemini-3.6-flash` pevně na výchozích hodnotách (další modely je budou odmítat). `leastThinking()` teď posílá `thinkingBudget` jen modelům `gemini-2*`, ostatním `thinkingLevel`. Nové `sampling(model, …)` (`src/lib/gemini-thinking.ts`) pošle `temperature` jen modelům, které ji ještě používají; všech 8 volání Gemini (počasí, kvíz, příběh + interaktivní příběh, chat/proaktivní zpráva/dobrodružství s jídlem mazlíčka, deník mazlíčka) ji tím prochází. Dnešní chování (`gemini-3-flash-preview`) se nemění.
+- **EN:** Google (notice of 2026-10-07) will reject `thinkingBudget` on upcoming models, and `temperature`/`topP`/`topK` are pinned to defaults from `gemini-3.6-flash` on (later models will reject them). `leastThinking()` now sends `thinkingBudget` only to `gemini-2*` models and `thinkingLevel` to everything else. New `sampling(model, …)` (`src/lib/gemini-thinking.ts`) forwards `temperature` only to models that still honour it; all 8 Gemini calls (weather, quiz, story + interactive story, pet chat / proactive message / food adventure, pet diary) go through it. Today's behaviour (`gemini-3-flash-preview`) is unchanged.
+
 ## 2.1.1 — 2026-09-24
 
 ### CZ
