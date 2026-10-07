@@ -37,24 +37,32 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // A role can have more than one account (e.g. a QA test child), so match
+    // the PIN against every candidate instead of expecting exactly one row.
     const supabase = createAdminClient();
-    const { data: user, error } = await supabase
+    const { data: candidates, error } = await supabase
       .from('bub_users')
       .select('*')
       .eq('role', role)
-      .single();
+      .order('created_at', { ascending: true });
 
-    if (error || !user) {
-      recordLoginAttempt(rateLimitKey, false);
+    if (error) {
+      console.error('Login lookup failed:', error);
       return NextResponse.json(
-        { success: false, error: 'Nesprávný PIN' },
-        { status: 401 }
+        { success: false, error: 'Chyba serveru' },
+        { status: 500 }
       );
     }
 
-    const valid = await verifyPin(pin, user.pin_hash);
+    let user = null;
+    for (const candidate of candidates ?? []) {
+      if (candidate.pin_hash && (await verifyPin(pin, candidate.pin_hash))) {
+        user = candidate;
+        break;
+      }
+    }
 
-    if (!valid) {
+    if (!user) {
       recordLoginAttempt(rateLimitKey, false);
       const remaining = rateCheck.remainingAttempts - 1;
       return NextResponse.json(

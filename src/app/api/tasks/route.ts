@@ -41,11 +41,14 @@ export async function POST(request: NextRequest) {
       const { createAdminClient } = await import('@/lib/supabase/admin');
       const supabase = createAdminClient();
       const targetRole = userRole === 'parent' ? 'child' : 'child';
+      // Oldest account of the role is the real one (test accounts come later)
       const { data: targetUser } = await supabase
         .from('bub_users')
         .select('id')
         .eq('role', targetRole)
-        .single();
+        .order('created_at', { ascending: true })
+        .limit(1)
+        .maybeSingle();
       assignTo = targetUser?.id || userId;
     }
 
