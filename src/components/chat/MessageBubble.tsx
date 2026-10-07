@@ -27,6 +27,8 @@ interface MessageBubbleProps {
   onRetry: (id: string) => void;
   onDiscard: (id: string) => void;
   onJumpTo: (id: string) => void;
+  /** Called after a reaction toggle so both sides pick up the new state */
+  onReacted: () => void;
 }
 
 const LONG_PRESS_MS = 350;
@@ -63,7 +65,7 @@ function LinkedText({ text, isMine }: { text: string; isMine: boolean }) {
 
 export function MessageBubble({
   message, isMine, currentUserId, names, joinsPrev, joinsNext, highlighted,
-  onReply, onEdit, onDelete, onRetry, onDiscard, onJumpTo,
+  onReply, onEdit, onDelete, onRetry, onDiscard, onJumpTo, onReacted,
 }: MessageBubbleProps) {
   const [fullscreen, setFullscreen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -143,7 +145,8 @@ export function MessageBubble({
     setMenuOpen(false);
     if (!currentUserId) return;
     void hapticTap();
-    await toggleReaction(message.id, emoji, currentUserId);
+    const result = await toggleReaction(message.id, emoji, currentUserId);
+    if (result.success) onReacted();
   };
 
   const handleCopy = async () => {

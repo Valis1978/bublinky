@@ -37,6 +37,13 @@ export function useMessages(userId: string | undefined) {
   const typingTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastTypingSent = useRef(0);
 
+  // Realtime carries no message content: bub_messages is not readable with the
+  // public anon key, so a change is announced with a content-free "sync" ping
+  // and the other side refetches through the authenticated API.
+  const ping = useCallback(() => {
+    void channelRef.current?.send({ type: 'broadcast', event: 'sync', payload: {} });
+  }, []);
+
   /** Merge server rows in, keeping optimistic rows that are still in flight. */
   const mergeServer = useCallback((rows: UiMessage[]) => {
     setMessages((prev) => {
@@ -95,6 +102,7 @@ export function useMessages(userId: string | undefined) {
       const data = await res.json();
       if (!data.success || !data.data) throw new Error(data.error || 'send failed');
       pendingSends.current.delete(tempId);
+      ping();
       // Swap the optimistic row for the real one (realtime may have added it already)
       setMessages((prev) => {
         const withoutTemp = prev.filter((m) => m.id !== tempId);
@@ -109,7 +117,7 @@ export function useMessages(userId: string | undefined) {
       );
       return { success: false };
     }
-  }, []);
+  }, [ping]);
 
   /** Show the message instantly, then confirm it with the server. */
   const sendMessage = useCallback(
@@ -171,27 +179,40 @@ export function useMessages(userId: string | undefined) {
     const data = await res.json();
     if (data.success && data.data) {
       setMessages((prev) => prev.map((m) => (m.id === id ? data.data : m)));
+      ping();
     }
     return data as { success: boolean; error?: string };
-  }, []);
+  }, [ping]);
 
   const deleteMessage = useCallback(async (id: string) => {
     const res = await fetch(`/api/messages/${id}`, { method: 'DELETE' });
     const data = await res.json();
     if (data.success && data.data) {
       setMessages((prev) => prev.map((m) => (m.id === id ? data.data : m)));
+      ping();
     }
     return data as { success: boolean; error?: string };
-  }, []);
+  }, [ping]);
+
+  /** After a reaction toggle: pull the fresh state and tell the other side. */
+  const syncNow = useCallback(async () => {
+    await fetchMessages();
+    ping();
+  }, [fetchMessages, ping]);
 
   const markAsRead = useCallback(async (messageIds: string[]) => {
     if (!messageIds.length) return;
+    // Mark locally first so the read effect doesn't fire again for the same ids
+    const readAt = new Date().toISOString();
+    setMessages((prev) => prev.map((m) => (messageIds.includes(m.id) ? { ...m, read_at: readAt } : m)));
     await fetch('/api/messages/read', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ message_ids: messageIds }),
     });
-  }, []);
+    // Let the sender's ✓ turn into ✓✓
+    ping();
+  }, [ping]);
 
   /** Tell the other side we're typing — throttled to one broadcast per 2 s. */
   const notifyTyping = useCallback(() => {
@@ -201,7 +222,7 @@ export function useMessages(userId: string | undefined) {
     void channelRef.current.send({ type: 'broadcast', event: 'typing', payload: { userId } });
   }, [userId]);
 
-  // Realtime: new/changed rows, presence (online) and typing broadcasts
+  // Realtime: sync pings, presence (online) and typing broadcasts
   useEffect(() => {
     if (!userId) return;
 
@@ -213,26 +234,10 @@ export function useMessages(userId: string | undefined) {
     });
 
     channel
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'bub_messages' },
-        (payload) => {
-          const newMsg = payload.new as UiMessage;
-          if (newMsg.sender_id !== userId) setOtherTyping(false);
-          setMessages((prev) => {
-            if (prev.some((m) => m.id === newMsg.id)) return prev;
-            return [...prev, newMsg];
-          });
-        }
-      )
-      .on(
-        'postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'bub_messages' },
-        (payload) => {
-          const updated = payload.new as UiMessage;
-          setMessages((prev) => prev.map((m) => (m.id === updated.id ? updated : m)));
-        }
-      )
+      .on('broadcast', { event: 'sync' }, () => {
+        setOtherTyping(false);
+        void fetchMessages();
+      })
       .on('presence', { event: 'sync' }, () => {
         const state = channel.presenceState();
         setOtherOnline(Object.keys(state).some((key) => key !== userId));
@@ -276,6 +281,7 @@ export function useMessages(userId: string | undefined) {
     otherOnline,
     otherTyping,
     sendMessage,
+    syncNow,
     retryMessage,
     discardMessage,
     editMessage,

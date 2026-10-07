@@ -58,7 +58,7 @@ export function ChatView() {
   const { user } = useAuth();
   const {
     messages, loading, hasOlder, loadingOlder, otherOnline, otherTyping,
-    sendMessage, retryMessage, discardMessage, editMessage, deleteMessage,
+    sendMessage, syncNow, retryMessage, discardMessage, editMessage, deleteMessage,
     markAsRead, loadOlder, notifyTyping,
   } = useMessages(user?.id);
   // Subscribe to push notifications — only parent gets them
@@ -364,6 +364,7 @@ export function ChatView() {
                 onRetry={retryMessage}
                 onDiscard={discardMessage}
                 onJumpTo={jumpTo}
+                onReacted={syncNow}
               />
             )
           )
