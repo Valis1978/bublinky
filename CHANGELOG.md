@@ -1,5 +1,10 @@
 # Changelog
 
+### 2026-10-07 — Next.js 16.3.8 (bezpečnostní záplata / security patch)
+
+- **CZ:** Next.js z 16.2.1 na 16.3.8 kvůli bezpečnostním opravám z 30. 9. 2026 (SSRF v optimalizaci obrázků, otrava ISR cache při vlastním hostingu). Skok mezi menšími verzemi přináší i drobné změny frameworku, kód aplikace se nemění.
+- **EN:** Next.js 16.2.1 → 16.3.8 for the 2026-09-30 security fixes (image optimizer SSRF, ISR cache poisoning when self-hosting). The minor-version jump brings small framework changes; app code unchanged.
+
 ## 2.1.0 — 2026-08-04 „Příběhy ožily"
 
 ### CZ
