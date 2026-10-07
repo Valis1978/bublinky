@@ -161,3 +161,30 @@
   background: var(--accent-soft);
   border-radius: 999px;
 }
+
+/* Page enter — opacity only: a transform here would re-anchor the fixed
+   BottomNav to the page wrapper instead of the viewport. */
+@keyframes page-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.page-enter {
+  animation: page-enter 220ms ease-out both;
+}
+
+/* Login backdrop bubbles drift up and wobble */
+@keyframes bubble-rise {
+  0% { transform: translate3d(0, 0, 0) scale(0.9); opacity: 0; }
+  10% { opacity: 1; }
+  50% { transform: translate3d(14px, -55vh, 0) scale(1); }
+  90% { opacity: 1; }
+  100% { transform: translate3d(-10px, -110vh, 0) scale(1.05); opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-enter,
+  .bubble-rise {
+    animation: none !important;
+  }
+}

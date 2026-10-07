@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { motion, type Variants } from 'framer-motion';
 import { BottomNav } from '@/components/ui/BottomNav';
 import { PetGreeting } from '@/components/home/PetGreeting';
 import { DailyGiftCard } from '@/components/home/DailyGiftCard';
@@ -33,6 +34,20 @@ const QUICK_LINKS: QuickLink[] = [
   { href: '/tasks', emoji: '📋', label: 'Úkoly' },
   { href: '/stories', emoji: '📖', label: 'Příběhy' },
 ];
+
+// Sections rise in one after another; quick-link tiles pop in as a group.
+const stagger: Variants = {
+  hidden: {},
+  show: { transition: { staggerChildren: 0.08 } },
+};
+const rise: Variants = {
+  hidden: { opacity: 0, y: 16 },
+  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 260, damping: 24 } },
+};
+const pop: Variants = {
+  hidden: { opacity: 0, scale: 0.8 },
+  show: { opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 320, damping: 18 } },
+};
 
 function greetingFor(time: ReturnType<typeof getCurrentTimeOfDay>): { text: string; emoji: string } {
   if (time === 'morning') return { text: 'Dobré ráno', emoji: '☀️' };
@@ -108,23 +123,39 @@ export default function HomePage() {
 
   return (
     <div className="flex flex-col h-dvh">
-      <div className="flex-1 overflow-y-auto px-4 pb-nav safe-top">
-        <h1 className="text-2xl font-bold mt-3 mb-4" style={{ color: 'var(--text-primary)' }}>
-          {greeting.text}, {name}! {greeting.emoji}
-        </h1>
+      <motion.div
+        className="flex-1 overflow-y-auto px-4 pb-nav safe-top"
+        variants={stagger}
+        initial="hidden"
+        animate="show"
+      >
+        <motion.h1 variants={rise} className="text-2xl font-bold mt-3 mb-4" style={{ color: 'var(--text-primary)' }}>
+          {greeting.text}, {name}!{' '}
+          <motion.span
+            className="inline-block origin-bottom"
+            animate={{ rotate: [0, 18, -10, 14, 0] }}
+            transition={{ duration: 1.2, delay: 0.4, ease: 'easeInOut' }}
+          >
+            {greeting.emoji}
+          </motion.span>
+        </motion.h1>
 
         {/* The pet rituals (greeting, gift, poll) belong to Viki — the parent
             sees a plain launcher instead. */}
-        {!isParent && <PetGreeting pet={pet} entry={entry} />}
-
-        {!isParent && pet && (
-          <div className="mt-3">
-            <DailyGiftCard pet={pet} onClaimed={setPet} />
-            <PetPollCard pet={pet} />
-          </div>
+        {!isParent && (
+          <motion.div variants={rise}>
+            <PetGreeting pet={pet} entry={entry} />
+          </motion.div>
         )}
 
-        <section className="mt-4" hidden={isParent}>
+        {!isParent && pet && (
+          <motion.div variants={rise} className="mt-3">
+            <DailyGiftCard pet={pet} onClaimed={setPet} />
+            <PetPollCard pet={pet} />
+          </motion.div>
+        )}
+
+        <motion.section variants={rise} className="mt-4" hidden={isParent}>
           <h2 className="text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
             Dnešní parta úkolů
           </h2>
@@ -154,31 +185,32 @@ export default function HomePage() {
               Splnit s parťákem →
             </Link>
           </div>
-        </section>
+        </motion.section>
 
-        <section className="mt-4 mb-4">
+        <motion.section variants={rise} className="mt-4 mb-4">
           <h2 className="text-sm font-bold mb-2" style={{ color: 'var(--text-primary)' }}>
             Rychlé odkazy
           </h2>
-          <div className="grid grid-cols-3 gap-3">
+          <motion.div className="grid grid-cols-3 gap-3" variants={stagger}>
             {(isParent
               ? [{ href: '/dashboard', emoji: '📊', label: 'Dashboard' }, ...QUICK_LINKS.filter(l => l.href !== '/pet')]
               : QUICK_LINKS
             ).map(link => (
-              <Link
-                key={link.href}
-                href={link.href}
-                onClick={() => void hapticTap()}
-                className="flex flex-col items-center justify-center gap-1 py-4 rounded-2xl"
-                style={{ background: 'var(--bg-card)', boxShadow: 'var(--shadow)' }}
-              >
-                <span className="text-3xl">{link.emoji}</span>
-                <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{link.label}</span>
-              </Link>
+              <motion.div key={link.href} variants={pop} whileTap={{ scale: 0.92 }}>
+                <Link
+                  href={link.href}
+                  onClick={() => void hapticTap()}
+                  className="flex flex-col items-center justify-center gap-1 py-4 rounded-2xl"
+                  style={{ background: 'var(--bg-card)', boxShadow: 'var(--shadow)' }}
+                >
+                  <span className="text-3xl">{link.emoji}</span>
+                  <span className="text-xs font-medium" style={{ color: 'var(--text-primary)' }}>{link.label}</span>
+                </Link>
+              </motion.div>
             ))}
-          </div>
-        </section>
-      </div>
+          </motion.div>
+        </motion.section>
+      </motion.div>
       <BottomNav />
     </div>
   );

@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next';
 import { Nunito, Inter } from 'next/font/google';
 import { ThemeProvider } from '@/components/providers/ThemeProvider';
 import { ActivityTracker } from '@/components/providers/ActivityTracker';
+import { MotionProvider } from '@/components/providers/MotionProvider';
 import './globals.css';
 
 const nunito = Nunito({
@@ -55,7 +56,7 @@ export default function RootLayout({
       <body className="min-h-dvh flex flex-col">
         <ThemeProvider>
           <ActivityTracker />
-          {children}
+          <MotionProvider>{children}</MotionProvider>
         </ThemeProvider>
       </body>
     </html>
