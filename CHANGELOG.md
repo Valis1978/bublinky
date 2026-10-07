@@ -1,5 +1,10 @@
 # Changelog
 
+### 2026-10-07 — Lišta mazlíčka už nepřekrývá spodní menu / Pet tab bar no longer overlaps the bottom nav
+
+- **CZ:** Na iPhonu s pruhem pro gesto lišta mazlíčka (Domov, Chat, Questy, Obchod, Batoh, Skilly) zajížděla pod spodní menu aplikace a popisky byly useknuté. Lišta se teď posouvá podle skutečné výšky menu včetně bezpečné zóny a obsah stránky má dost místa nad oběma lištami.
+- **EN:** On iPhones with a home indicator the pet tab bar sat at a fixed 76px and slid under the BottomNav (64px + safe-area padding), clipping its labels. It now sits at the nav's real height (`.above-nav`), and the pet content padding accounts for both bars (`.pb-pet-tabs`).
+
 ### 2026-10-07 — Next.js 16.3.8 (bezpečnostní záplata / security patch)
 
 - **CZ:** Next.js z 16.2.1 na 16.3.8 kvůli bezpečnostním opravám z 30. 9. 2026 (SSRF v optimalizaci obrázků, otrava ISR cache při vlastním hostingu). Skok mezi menšími verzemi přináší i drobné změny frameworku, kód aplikace se nemění.

@@ -339,7 +339,7 @@ export default function PetPage() {
       </div>
 
       {/* Tab content — extra padding for PetTabBar + BottomNav */}
-      <div className="flex-1 overflow-hidden" style={{ paddingBottom: '130px' }}>
+      <div className="flex-1 overflow-hidden pb-pet-tabs">
         {tab === 'home' && (
           <div className="h-full overflow-y-auto pb-2">
             {/* Pet in its room */}

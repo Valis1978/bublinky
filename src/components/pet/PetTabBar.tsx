@@ -24,8 +24,8 @@ const TABS: { id: PetTab; icon: typeof Home; label: string }[] = [
 export function PetTabBar({ active, onChange, unreadChat, activeQuests }: PetTabBarProps) {
   return (
     <div
-      className="fixed left-0 right-0 z-40 flex justify-around py-1 px-2"
-      style={{ background: 'var(--bg-card)', borderTop: '1px solid var(--border)', bottom: '76px' }}
+      className="fixed left-0 right-0 z-40 flex justify-around py-1 px-2 above-nav"
+      style={{ background: 'var(--bg-card)', borderTop: '1px solid var(--border)' }}
     >
       {TABS.map(tab => {
         const isActive = active === tab.id;

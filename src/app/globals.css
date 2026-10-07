@@ -147,6 +147,16 @@
   .pb-nav {
     padding-bottom: calc(5rem + env(safe-area-inset-bottom, 0px));
   }
+
+  /* Sits right on top of BottomNav: h-16 + .safe-bottom padding + 1px border */
+  .above-nav {
+    bottom: calc(4rem + 1px + max(1rem, env(safe-area-inset-bottom)));
+  }
+
+  /* Content padding to clear PetTabBar (~68px) stacked on BottomNav */
+  .pb-pet-tabs {
+    padding-bottom: calc(8.25rem + 1px + max(1rem, env(safe-area-inset-bottom)));
+  }
 }
 
 ::-webkit-scrollbar {
