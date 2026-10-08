@@ -1,3 +1,4 @@
+import { authorizeUserRequest } from '@/lib/server/authorize-user';
 // Saved interactive stories — the reader's own little bookshelf.
 //
 // GET  /api/stories?userId=...  -> last 20 stories
@@ -58,6 +59,8 @@ function normalizeSegments(raw: unknown): StorySegment[] {
 
 export async function GET(request: NextRequest) {
   const userId = asString(request.nextUrl.searchParams.get('userId'));
+  const denied = await authorizeUserRequest(request, userId, { allowParentRead: true });
+  if (denied) return denied;
   if (!userId) {
     return NextResponse.json({ success: false, error: 'Chybí userId' }, { status: 400 });
   }
@@ -103,6 +106,8 @@ export async function POST(request: NextRequest) {
   }
 
   const userId = asString(body.userId);
+  const denied = await authorizeUserRequest(request, userId);
+  if (denied) return denied;
   if (!userId) {
     return NextResponse.json({ success: false, error: 'Chybí userId' }, { status: 400 });
   }

@@ -1,9 +1,12 @@
+import { authorizeUserRequest } from '@/lib/server/authorize-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 // GET /api/stats?userId=xxx — Load stats from DB
 export async function GET(req: NextRequest) {
   const userId = req.nextUrl.searchParams.get('userId');
+  const denied = await authorizeUserRequest(req, userId, { allowParentRead: true });
+  if (denied) return denied;
   if (!userId) return NextResponse.json({ error: 'Missing userId' }, { status: 400 });
 
   const supabase = createAdminClient();
@@ -41,6 +44,8 @@ export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
     const { userId, stats } = body;
+    const denied = await authorizeUserRequest(req, userId);
+    if (denied) return denied;
 
     if (!userId || !stats) {
       return NextResponse.json({ error: 'Missing userId or stats' }, { status: 400 });

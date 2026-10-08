@@ -1,3 +1,4 @@
+import { authorizeUserRequest, requestSession } from '@/lib/server/authorize-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import type { ReadingLogEntry, ReadingStatus } from '@/types/story';
@@ -25,6 +26,8 @@ interface ReadingLogRow {
 /** GET /api/reading-log?userId=xxx — list a child's reading log ("Čtenářský deníček") */
 export async function GET(req: NextRequest) {
   const userId = req.nextUrl.searchParams.get('userId');
+  const denied = await authorizeUserRequest(req, userId, { allowParentRead: true });
+  if (denied) return denied;
   if (!userId) return NextResponse.json({ success: false, error: 'userId required' }, { status: 400 });
 
   try {
@@ -61,6 +64,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { userId, bookTitle, author, cameoId, status } = body;
+    const denied = await authorizeUserRequest(req, userId);
+    if (denied) return denied;
 
     if (!userId) {
       return NextResponse.json({ success: false, error: 'userId required' }, { status: 400 });
@@ -117,6 +122,8 @@ export async function POST(req: NextRequest) {
 
 /** PATCH /api/reading-log — update status; setting 'done' stamps finished_at */
 export async function PATCH(req: NextRequest) {
+  const session = await requestSession(req);
+  if (!session) return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
   try {
     const body = await req.json();
     const { id, status } = body;
@@ -131,14 +138,19 @@ export async function PATCH(req: NextRequest) {
       updates.finished_at = new Date().toISOString();
     }
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('bub_reading_log')
       .update(updates)
-      .eq('id', id);
+      .eq('id', id)
+      .eq('user_id', session.user_id)
+      .select('id')
+      .maybeSingle();
 
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
+
+    if (!data) return NextResponse.json({ success: false, error: 'Entry not found' }, { status: 404 });
 
     return NextResponse.json({ success: true });
   } catch (err) {

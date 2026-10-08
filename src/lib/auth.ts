@@ -2,9 +2,13 @@ import bcrypt from 'bcryptjs';
 import { SignJWT, jwtVerify } from 'jose';
 import type { SessionPayload, UserRole } from '@/types/database';
 
-const JWT_SECRET = new TextEncoder().encode(
-  process.env.JWT_SECRET || 'bublinky-dev-secret-change-me'
-);
+function sessionSecret(): Uint8Array {
+  const secret = process.env.JWT_SECRET;
+  if (!secret || new TextEncoder().encode(secret).length < 32) {
+    throw new Error('JWT_SECRET must contain at least 32 bytes');
+  }
+  return new TextEncoder().encode(secret);
+}
 
 const SESSION_DURATION = 30 * 24 * 60 * 60; // 30 days in seconds
 
@@ -25,7 +29,7 @@ export async function createSession(
     .setProtectedHeader({ alg: 'HS256' })
     .setIssuedAt()
     .setExpirationTime(`${SESSION_DURATION}s`)
-    .sign(JWT_SECRET);
+    .sign(sessionSecret());
 
   return token;
 }
@@ -34,7 +38,15 @@ export async function verifySession(
   token: string
 ): Promise<SessionPayload | null> {
   try {
-    const { payload } = await jwtVerify(token, JWT_SECRET);
+    const { payload } = await jwtVerify(token, sessionSecret(), {
+      algorithms: ['HS256'],
+      requiredClaims: ['iat', 'exp'],
+    });
+    if (
+      typeof payload.user_id !== 'string' || !payload.user_id ||
+      (payload.role !== 'parent' && payload.role !== 'child') ||
+      typeof payload.name !== 'string'
+    ) return null;
     return payload as unknown as SessionPayload;
   } catch {
     return null;

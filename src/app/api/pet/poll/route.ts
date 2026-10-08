@@ -1,3 +1,4 @@
+import { authorizeUserRequest } from '@/lib/server/authorize-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { embedText, toVectorLiteral } from '@/lib/server/embeddings';
@@ -17,6 +18,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { userId, pollId, question, answer } = body;
+    const denied = await authorizeUserRequest(req, userId);
+    if (denied) return denied;
 
     if (!userId || !pollId) {
       return NextResponse.json({ success: false, error: 'userId a pollId jsou povinné' }, { status: 400 });

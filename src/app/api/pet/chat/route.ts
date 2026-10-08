@@ -1,3 +1,4 @@
+import { authorizePetRequest } from '@/lib/server/authorize-user';
 import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { getFamilyContext } from '@/lib/custody-calendar';
@@ -302,6 +303,8 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { petId, petName, species, stage, level, mood, hunger, happiness, energy, cleanliness, message, skills, personalityTraits, foodBravery, evolutionPath, englishLevel, englishWordsLearned, gameMode, lastStory } = body;
+    const denied = await authorizePetRequest(req, petId);
+    if (denied) return denied;
 
     const supabase = getSupabaseAdmin();
 

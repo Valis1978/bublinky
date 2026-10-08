@@ -1,3 +1,4 @@
+import { authorizePetRequest } from '@/lib/server/authorize-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getNextFoodToTry } from '@/lib/food-catalog';
@@ -25,6 +26,8 @@ export async function POST(req: NextRequest) {
 
   try {
     const { petId, petName, species, foodBravery, foodsTried } = await req.json();
+    const denied = await authorizePetRequest(req, petId);
+    if (denied) return denied;
 
     // Pick next food to try
     const food = getNextFoodToTry(foodsTried || [], foodBravery || 0);

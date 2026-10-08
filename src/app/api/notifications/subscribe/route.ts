@@ -1,3 +1,4 @@
+import { authorizeUserRequest } from '@/lib/server/authorize-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -11,6 +12,8 @@ function getSupabase() {
 export async function POST(req: NextRequest) {
   try {
     const { subscription, userId } = await req.json();
+    const denied = await authorizeUserRequest(req, userId);
+    if (denied) return denied;
 
     if (!subscription || !userId) {
       return NextResponse.json({ error: 'Missing data' }, { status: 400 });

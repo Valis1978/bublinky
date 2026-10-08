@@ -1,3 +1,4 @@
+import { authorizeUserRequest } from '@/lib/server/authorize-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -5,6 +6,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 export async function POST(req: NextRequest) {
   try {
     const { userId, latitude, longitude, accuracy, batteryLevel } = await req.json();
+    const denied = await authorizeUserRequest(req, userId);
+    if (denied) return denied;
     if (!userId || !latitude || !longitude) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
     }
@@ -32,6 +35,8 @@ export async function POST(req: NextRequest) {
 // GET /api/location?userId=xxx&limit=20 — Get location history (parent dashboard)
 export async function GET(req: NextRequest) {
   const userId = req.nextUrl.searchParams.get('userId');
+  const denied = await authorizeUserRequest(req, userId, { allowParentRead: true });
+  if (denied) return denied;
   const limit = parseInt(req.nextUrl.searchParams.get('limit') || '20');
 
   if (!userId) {

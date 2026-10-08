@@ -1,3 +1,4 @@
+import { authorizeUserRequest } from '@/lib/server/authorize-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
@@ -18,6 +19,8 @@ export async function POST(req: NextRequest) {
       eventType: string;
       eventData?: Record<string, unknown>;
     };
+    const denied = await authorizeUserRequest(req, userId);
+    if (denied) return denied;
     if (!userId || !eventType) {
       return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
     }
@@ -52,6 +55,8 @@ export async function POST(req: NextRequest) {
 // GET /api/activity?userId=xxx&limit=50 — Get activity feed (parent dashboard)
 export async function GET(req: NextRequest) {
   const userId = req.nextUrl.searchParams.get('userId');
+  const denied = await authorizeUserRequest(req, userId, { allowParentRead: true });
+  if (denied) return denied;
   const limit = parseInt(req.nextUrl.searchParams.get('limit') || '50');
   const since = req.nextUrl.searchParams.get('since'); // ISO date
 

@@ -1,3 +1,4 @@
+import { authorizeUserRequest } from '@/lib/server/authorize-user';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
@@ -11,6 +12,8 @@ function getSupabaseAdmin() {
 /** GET /api/pet?userId=xxx — load pet from Supabase */
 export async function GET(req: NextRequest) {
   const userId = req.nextUrl.searchParams.get('userId');
+  const denied = await authorizeUserRequest(req, userId, { allowParentRead: true });
+  if (denied) return denied;
   if (!userId) return NextResponse.json({ success: false, error: 'userId required' }, { status: 400 });
 
   try {
@@ -85,6 +88,8 @@ export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
     const { userId, pet } = body;
+    const denied = await authorizeUserRequest(req, userId);
+    if (denied) return denied;
     if (!userId || !pet) return NextResponse.json({ success: false, error: 'userId and pet required' }, { status: 400 });
 
     const supabase = getSupabaseAdmin();

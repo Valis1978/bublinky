@@ -5,6 +5,17 @@ function getClient() {
   return createAdminClient();
 }
 
+async function setTaskCompletion(taskId: string, completed: boolean, assignedTo?: string): Promise<{ error?: string; notFound?: boolean }> {
+  let query = getClient().from('bub_tasks')
+    .update({ completed_at: completed ? new Date().toISOString() : null, updated_at: new Date().toISOString() })
+    .eq('id', taskId);
+  // The ownership predicate must be part of the UPDATE, not a separate read.
+  if (assignedTo) query = query.eq('assigned_to', assignedTo);
+  const { data, error } = await query.select('id').maybeSingle();
+  if (error) return { error: error.message };
+  return data ? {} : { notFound: true };
+}
+
 export const taskService = {
   async getTasks(assignedTo?: string): Promise<{ data: BubTask[]; error?: string }> {
     const supabase = getClient();
@@ -55,26 +66,12 @@ export const taskService = {
     return { data: data as BubTask };
   },
 
-  async completeTask(taskId: string): Promise<{ error?: string }> {
-    const supabase = getClient();
-    const { error } = await supabase
-      .from('bub_tasks')
-      .update({ completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-      .eq('id', taskId);
-
-    if (error) return { error: error.message };
-    return {};
+  async completeTask(taskId: string, assignedTo?: string): Promise<{ error?: string; notFound?: boolean }> {
+    return setTaskCompletion(taskId, true, assignedTo);
   },
 
-  async uncompleteTask(taskId: string): Promise<{ error?: string }> {
-    const supabase = getClient();
-    const { error } = await supabase
-      .from('bub_tasks')
-      .update({ completed_at: null, updated_at: new Date().toISOString() })
-      .eq('id', taskId);
-
-    if (error) return { error: error.message };
-    return {};
+  async uncompleteTask(taskId: string, assignedTo?: string): Promise<{ error?: string; notFound?: boolean }> {
+    return setTaskCompletion(taskId, false, assignedTo);
   },
 
   async deleteTask(taskId: string): Promise<{ error?: string }> {
