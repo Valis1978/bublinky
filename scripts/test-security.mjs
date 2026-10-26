@@ -136,11 +136,10 @@ test('pet generation refuses another account pet before memory reads, embeddings
       '@/lib/custody-calendar': {}, '@/lib/safe-json': {}, '@/lib/gemini-thinking': {},
       '@/lib/chat-games': {}, '@/lib/server/pet-profile': {}, '@/lib/food-catalog': {},
       '@/lib/server/embeddings': { embedText: forbidden },
+      '@/lib/server/gemini': { geminiConfigured: () => true, generateContent: forbidden },
     };
     for (const route of ['pet/chat', 'pet/proactive', 'pet/food-adventure']) {
-      const api = loadTs(`../src/app/api/${route}/route.ts`, deps, {
-        process: { env: { GOOGLE_API_KEY: 'test-only' } }, fetch: forbidden,
-      });
+      const api = loadTs(`../src/app/api/${route}/route.ts`, deps, { fetch: forbidden });
       assert.equal((await api.POST(request('POST', { petId: 'pet-b' }, child))).status, 404);
       assert.equal((await api.POST(request('POST', { petId: 'pet-a' }, parent))).status, 404, 'parent cannot write a child pet');
       const before = lookups;

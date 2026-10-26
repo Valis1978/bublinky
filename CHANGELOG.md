@@ -1,5 +1,10 @@
 # Changelog
 
+### 2026-10-26 — AI zase odpovídá: Gemini přes Vertex AI / AI answers again: Gemini on Vertex AI
+
+- **CZ:** Od 16. 10. 2026 vracely klíče Google AI Studia chybu 402 (fakturační účet bez předplaceného kreditu). Mazlíček proto jen „přemýšlel“, příběhy, kvízy a rada k počasí hlásily nedostupnou AI a nové vzpomínky se ukládaly bez vektoru. Všech 8 volání Gemini i embeddingy paměti mazlíčka teď jdou přes Vertex AI, který se platí zpětně, se štítky `klient=interni`, `sluzba=bublinky`. Embeddingy používají stejný model, typ úlohy i rozměr jako uložené vektory (`gemini-embedding-001`, 768) a ve Vertexu běží v `europe-west1`. Bez proměnných Vertexu zůstává klíč AI Studia, takže návrat znamená jen smazat proměnné. Texty, prompty, model i chování mazlíčka se nemění.
+- **EN:** From 2026-10-16 every Google AI Studio key answered 402 (no prepaid credit on the billing account): the pet only "thought", stories, the quiz and weather advice reported the AI as unavailable, and new memories were stored without a vector. All 8 Gemini calls and the pet-memory embeddings now go through Vertex AI (billed afterwards) when `GOOGLE_VERTEX_PROJECT` and `GOOGLE_SERVICE_ACCOUNT_JSON` are set, with the billing labels `klient=interni`, `sluzba=bublinky`; without them the AI Studio key is used, so rolling back is an env change. Embeddings keep the stored vectors' model, task type and size (`gemini-embedding-001`, 768) and run in `europe-west1` on Vertex. Texts, prompts, the model and the pet's behaviour are unchanged. New offline transport tests: `node --test scripts/test-gemini.mjs`.
+
 ### 2026-10-07 — Lišta mazlíčka už nepřekrývá spodní menu / Pet tab bar no longer overlaps the bottom nav
 
 - **CZ:** Na iPhonu s pruhem pro gesto lišta mazlíčka (Domov, Chat, Questy, Obchod, Batoh, Skilly) zajížděla pod spodní menu aplikace a popisky byly useknuté. Lišta se teď posouvá podle skutečné výšky menu včetně bezpečné zóny a obsah stránky má dost místa nad oběma lištami.

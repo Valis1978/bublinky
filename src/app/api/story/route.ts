@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sampling } from '@/lib/gemini-thinking';
+import { geminiConfigured, generateContent } from '@/lib/server/gemini';
 
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-3-flash-preview';
 
 export async function POST(req: NextRequest) {
@@ -12,7 +12,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Chybí jméno nebo žánr' }, { status: 400 });
     }
 
-    if (!GOOGLE_API_KEY) {
+    if (!geminiConfigured()) {
       return NextResponse.json({ error: 'API klíč není nastaven' }, { status: 500 });
     }
 
@@ -39,21 +39,14 @@ Pravidla:
   "moral": "Poučení z příběhu (1 věta)"
 }`;
 
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GOOGLE_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: {
-            ...sampling(MODEL, { temperature: 0.9 }),
-            maxOutputTokens: 65536,
-            responseMimeType: 'application/json',
-          },
-        }),
-      }
-    );
+    const response = await generateContent(MODEL, {
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: {
+        ...sampling(MODEL, { temperature: 0.9 }),
+        maxOutputTokens: 65536,
+        responseMimeType: 'application/json',
+      },
+    });
 
     if (!response.ok) {
       return NextResponse.json({ error: 'AI momentálně nedostupné' }, { status: 502 });

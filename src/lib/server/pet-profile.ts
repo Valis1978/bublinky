@@ -6,6 +6,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { safeParseJSON } from '@/lib/safe-json';
 import { leastThinking, sampling, THINKING_HEADROOM } from '@/lib/gemini-thinking';
+import { geminiConfigured, generateContent } from '@/lib/server/gemini';
 
 const MODEL = 'gemini-3-flash-preview';
 const REQUEST_TIMEOUT_MS = 15000;
@@ -41,8 +42,7 @@ export async function maybeConsolidateProfile(
   petId: string,
   petName: string
 ): Promise<void> {
-  const apiKey = process.env.GOOGLE_API_KEY;
-  if (!apiKey || !petId) return;
+  if (!geminiConfigured() || !petId) return;
 
   try {
     const { count, error: countError } = await supabase
@@ -89,25 +89,21 @@ export async function maybeConsolidateProfile(
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${apiKey}`,
+    const res = await generateContent(
+      MODEL,
       {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: buildPrompt(petName, previousProfile, transcript) }] }],
-          generationConfig: {
-            ...sampling(MODEL, { temperature: 0.3 }),
-            // Gemini 3 spends "thinking" tokens from this budget — without a
-            // thinking floor the diary gets truncated to invalid JSON, and
-            // thinkingBudget: 0 is ignored by 3.7/3.8 (see gemini-thinking.ts).
-            maxOutputTokens: 2048 + THINKING_HEADROOM,
-            thinkingConfig: leastThinking(MODEL),
-            responseMimeType: 'application/json',
-          },
-        }),
-        signal: controller.signal,
-      }
+        contents: [{ role: 'user', parts: [{ text: buildPrompt(petName, previousProfile, transcript) }] }],
+        generationConfig: {
+          ...sampling(MODEL, { temperature: 0.3 }),
+          // Gemini 3 spends "thinking" tokens from this budget — without a
+          // thinking floor the diary gets truncated to invalid JSON, and
+          // thinkingBudget: 0 is ignored by 3.7/3.8 (see gemini-thinking.ts).
+          maxOutputTokens: 2048 + THINKING_HEADROOM,
+          thinkingConfig: leastThinking(MODEL),
+          responseMimeType: 'application/json',
+        },
+      },
+      controller.signal
     ).finally(() => clearTimeout(timeout));
 
     if (!res.ok) {

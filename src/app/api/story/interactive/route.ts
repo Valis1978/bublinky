@@ -14,9 +14,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { CAMEOS, type CameoDef } from '@/lib/story-cameos';
 import { safeParseJSON } from '@/lib/safe-json';
 import { sampling } from '@/lib/gemini-thinking';
+import { geminiConfigured, generateContent } from '@/lib/server/gemini';
 import type { StoryChoice, StorySegment, StorySetup, StoryStepResponse } from '@/types/story';
 
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-3-flash-preview';
 const REQUEST_TIMEOUT_MS = 15000;
 const CHOICE_IDS = ['a', 'b', 'c'] as const;
@@ -299,17 +299,13 @@ async function callGemini(prompt: string, temperature: number, maxOutputTokens: 
   const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
   try {
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GOOGLE_API_KEY}`,
+    const res = await generateContent(
+      MODEL,
       {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { ...sampling(MODEL, { temperature }), maxOutputTokens, responseMimeType: 'application/json' },
-        }),
-        signal: controller.signal,
-      }
+        contents: [{ role: 'user', parts: [{ text: prompt }] }],
+        generationConfig: { ...sampling(MODEL, { temperature }), maxOutputTokens, responseMimeType: 'application/json' },
+      },
+      controller.signal
     );
 
     if (!res.ok) throw new Error(`Gemini HTTP ${res.status}`);
@@ -401,8 +397,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json(body, { status: 400 });
   }
 
-  if (!GOOGLE_API_KEY) {
-    console.error('[Story Interactive] GOOGLE_API_KEY is not set');
+  if (!geminiConfigured()) {
+    console.error('[Story Interactive] Gemini is not configured');
     const body: StoryStepResponse = { success: false, error: AI_BUSY_ERROR };
     return NextResponse.json(body, { status: 200 });
   }

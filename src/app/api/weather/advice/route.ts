@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { safeParseJSON } from '@/lib/safe-json';
 import { leastThinking, sampling, THINKING_HEADROOM } from '@/lib/gemini-thinking';
+import { geminiConfigured, generateContent } from '@/lib/server/gemini';
 
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
 const MODEL = 'gemini-3-flash-preview';
 
 export async function POST(req: NextRequest) {
-  if (!GOOGLE_API_KEY) {
+  if (!geminiConfigured()) {
     return NextResponse.json({ success: false, error: 'API key missing' }, { status: 500 });
   }
 
@@ -32,23 +32,16 @@ Na základě VŠECH údajů (včetně pocitové teploty, větru, vlhkosti) odpov
 
 Odpověz POUZE validním JSON, nic jiného.`;
 
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent?key=${GOOGLE_API_KEY}`,
-      {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }],
-          // Thoughts count into maxOutputTokens — default thinking cut the advice to invalid JSON
-          generationConfig: {
-            ...sampling(MODEL, { temperature: 0.9 }),
-            maxOutputTokens: 1024 + THINKING_HEADROOM,
-            thinkingConfig: leastThinking(MODEL),
-            responseMimeType: 'application/json',
-          },
-        }),
-      }
-    );
+    const res = await generateContent(MODEL, {
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      // Thoughts count into maxOutputTokens — default thinking cut the advice to invalid JSON
+      generationConfig: {
+        ...sampling(MODEL, { temperature: 0.9 }),
+        maxOutputTokens: 1024 + THINKING_HEADROOM,
+        thinkingConfig: leastThinking(MODEL),
+        responseMimeType: 'application/json',
+      },
+    });
 
     if (!res.ok) {
       const errText = await res.text();

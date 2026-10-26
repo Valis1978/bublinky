@@ -2,7 +2,7 @@
 
 iOS companion appka pro Viki (10) — mazlíček s AI duší, hry, učení, chat s tátou.
 
-**Web:** Next.js 16 + React 19 + TS strict + Tailwind 4 · **iOS:** Capacitor shell načítající `https://bublinky.mujagent.cz` · **DB:** Supabase (Valis1978, tabulky `bub_*`) · **AI:** Gemini 3 Flash (duše mazlíčka, kvízy, příběhy, počasí)
+**Web:** Next.js 16 + React 19 + TS strict + Tailwind 4 · **iOS:** Capacitor shell načítající `https://bublinky.mujagent.cz` · **DB:** Supabase (Valis1978, tabulky `bub_*`) · **AI:** Gemini 3 Flash přes Vertex AI, záložně klíč AI Studia (duše mazlíčka, kvízy, příběhy, počasí; `src/lib/server/gemini.ts`)
 
 ## Hlavní části
 
@@ -23,6 +23,7 @@ iOS companion appka pro Viki (10) — mazlíček s AI duší, hry, učení, chat
 npm run dev        # localhost:3000
 npx tsc --noEmit   # typecheck
 npm run build
+node --test scripts/test-security.mjs scripts/test-gemini.mjs   # offline tests
 ```
 
 Env: viz `.env.local.example`. Auth = PIN → JWT cookie `bub_session` (middleware).
