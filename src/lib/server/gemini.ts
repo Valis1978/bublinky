@@ -15,6 +15,20 @@ const VERTEX_LABELS = { klient: 'interni', sluzba: 'bublinky' };
 
 const CLOUD_PLATFORM_SCOPE = 'https://www.googleapis.com/auth/cloud-platform';
 
+type Method = 'generateContent' | 'embedContent';
+
+/**
+ * Models Bublinky may call, per method: gemini-3-flash-preview for the pet,
+ * stories, quiz and weather, gemini-embedding-001 for the pet's memory. The
+ * routes name their model in code, but nothing stopped a new or edited call
+ * from running any model, at any price, on the service account. Anything else
+ * is refused before the token and the request. A new model = one line here.
+ */
+export const ALLOWED_MODELS: Readonly<Record<Method, ReadonlySet<string>>> = {
+  generateContent: new Set(['gemini-3-flash-preview']),
+  embedContent: new Set(['gemini-embedding-001']),
+};
+
 export interface GeminiRequest {
   contents: Array<{ role: 'user' | 'model'; parts: Array<{ text: string }> }>;
   generationConfig?: {
@@ -91,6 +105,16 @@ function requireBackend(): Backend {
   return ai;
 }
 
+/** The model id as called; throws, after one log line without the prompt, when it is off the allowlist. */
+function allowedModel(model: string, method: Method): string {
+  const id = model.replace(/^models\//, '');
+  if (ALLOWED_MODELS[method].has(id)) return id;
+  // Quoted and cut, so an id cannot add lines to the log.
+  const shown = JSON.stringify(id.slice(0, 80));
+  console.error(`[Gemini] refused model ${shown} (${method}): not on the allowlist`);
+  throw new Error(`model ${shown} is not on the allowlist`);
+}
+
 function vertexModelUrl(ai: VertexBackend, location: string, model: string, method: string): string {
   const host = location === 'global' ? 'aiplatform.googleapis.com' : `${location}-aiplatform.googleapis.com`;
   return `https://${host}/v1/projects/${ai.project}/locations/${location}/publishers/google/models/${model}:${method}`;
@@ -103,27 +127,66 @@ async function vertexHeaders(ai: VertexBackend): Promise<Record<string, string>>
 }
 
 /**
+ * One log line per call, the only record of what Bublinky spends: model,
+ * backend, outcome, tokens and time; never the prompt, the answer or a key.
+ */
+function logCall(id: string, via: string, startedAt: number, outcome: string, ok: boolean): void {
+  const line = `[Gemini] ${id} via ${via}: ${outcome}, ${Date.now() - startedAt} ms`;
+  if (ok) console.log(line);
+  else console.error(line);
+}
+
+/** A thrown error on one short line, e.g. "failed (TypeError: fetch failed)"; an AI Studio key in a URL is masked. */
+function failure(err: unknown): string {
+  const text = err instanceof Error ? `${err.name}: ${err.message}` : String(err);
+  return `failed (${text.replace(/([?&]key=)[^&\s]+/g, '$1***').replace(/\s+/g, ' ').slice(0, 160)})`;
+}
+
+/** Token counts of a generateContent answer, read from a copy so the route still gets the whole body. */
+async function generateTokens(res: Response): Promise<string> {
+  try {
+    const { usageMetadata: u } = (await res.clone().json()) as {
+      usageMetadata?: { promptTokenCount?: number; candidatesTokenCount?: number; thoughtsTokenCount?: number };
+    };
+    return `, tokens in/out/thoughts ${u?.promptTokenCount ?? 0}/${u?.candidatesTokenCount ?? 0}/${u?.thoughtsTokenCount ?? 0}`;
+  } catch {
+    return ', tokens unknown';
+  }
+}
+
+/**
  * POST :generateContent on the configured backend. Resolves to the raw Response,
- * so every route keeps its own status and fallback handling; throws when nothing
- * is configured or the service account cannot sign in.
+ * so every route keeps its own status and fallback handling; throws when the
+ * model is off the allowlist, nothing is configured or the service account
+ * cannot sign in.
  */
 export async function generateContent(model: string, request: GeminiRequest, signal?: AbortSignal): Promise<Response> {
-  const ai = requireBackend();
-  const res =
-    ai.kind === 'vertex'
-      ? await fetch(vertexModelUrl(ai, ai.location, model, 'generateContent'), {
-          method: 'POST',
-          headers: await vertexHeaders(ai),
-          body: JSON.stringify({ ...request, labels: VERTEX_LABELS }),
-          signal,
-        })
-      : await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${ai.apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(request),
-          signal,
-        });
-  if (!res.ok) console.error(`[Gemini] ${ai.name} ${model}: HTTP ${res.status}`);
+  const id = allowedModel(model, 'generateContent');
+  const startedAt = Date.now();
+  let via = 'no backend';
+  let res: Response;
+  try {
+    const ai = requireBackend();
+    via = ai.name;
+    res =
+      ai.kind === 'vertex'
+        ? await fetch(vertexModelUrl(ai, ai.location, id, 'generateContent'), {
+            method: 'POST',
+            headers: await vertexHeaders(ai),
+            body: JSON.stringify({ ...request, labels: VERTEX_LABELS }),
+            signal,
+          })
+        : await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${id}:generateContent?key=${ai.apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(request),
+            signal,
+          });
+  } catch (err) {
+    logCall(id, via, startedAt, failure(err), false);
+    throw err;
+  }
+  logCall(id, via, startedAt, `HTTP ${res.status}${res.ok ? await generateTokens(res) : ''}`, res.ok);
   return res;
 }
 
@@ -134,42 +197,62 @@ function isNumberArray(value: unknown): value is number[] {
 /**
  * One text embedding. Vertex serves the embedding models on regional endpoints
  * only and through :predict; AI Studio through :embedContent. Same model, task
- * type and dimensions give the same vector on both. Throws on any failure.
+ * type and dimensions give the same vector on both. Throws on any failure,
+ * a model off the allowlist included.
  */
 export async function embedContent(
   model: string,
   text: string,
   options: { taskType: string; dimensions: number; vertexLocation: string; signal?: AbortSignal }
 ): Promise<number[]> {
-  const ai = requireBackend();
-  const res =
-    ai.kind === 'vertex'
-      ? await fetch(vertexModelUrl(ai, options.vertexLocation, model, 'predict'), {
-          method: 'POST',
-          headers: await vertexHeaders(ai),
-          body: JSON.stringify({
-            instances: [{ content: text, task_type: options.taskType }],
-            parameters: { outputDimensionality: options.dimensions },
-          }),
-          signal: options.signal,
-        })
-      : await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:embedContent?key=${ai.apiKey}`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            content: { parts: [{ text }] },
-            taskType: options.taskType,
-            outputDimensionality: options.dimensions,
-          }),
-          signal: options.signal,
-        });
-  if (!res.ok) throw new Error(`embed HTTP ${res.status} (${ai.name})`);
+  const id = allowedModel(model, 'embedContent');
+  const startedAt = Date.now();
+  let via = 'no backend';
+  let vertex = false;
+  let res: Response;
+  try {
+    const ai = requireBackend();
+    via = ai.name;
+    vertex = ai.kind === 'vertex';
+    res =
+      ai.kind === 'vertex'
+        ? await fetch(vertexModelUrl(ai, options.vertexLocation, id, 'predict'), {
+            method: 'POST',
+            headers: await vertexHeaders(ai),
+            body: JSON.stringify({
+              instances: [{ content: text, task_type: options.taskType }],
+              parameters: { outputDimensionality: options.dimensions },
+            }),
+            signal: options.signal,
+          })
+        : await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${id}:embedContent?key=${ai.apiKey}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              content: { parts: [{ text }] },
+              taskType: options.taskType,
+              outputDimensionality: options.dimensions,
+            }),
+            signal: options.signal,
+          });
+  } catch (err) {
+    logCall(id, via, startedAt, failure(err), false);
+    throw err;
+  }
+  if (!res.ok) {
+    logCall(id, via, startedAt, `HTTP ${res.status}`, false);
+    throw new Error(`embed HTTP ${res.status} (${via})`);
+  }
 
-  const data = (await res.json()) as {
+  const data = (await res.json().catch(() => null)) as {
     embedding?: { values?: unknown };
-    predictions?: Array<{ embeddings?: { values?: unknown } }>;
-  };
-  const values = ai.kind === 'vertex' ? data.predictions?.[0]?.embeddings?.values : data.embedding?.values;
+    predictions?: Array<{ embeddings?: { values?: unknown; statistics?: { token_count?: unknown } } }>;
+  } | null;
+  const prediction = data?.predictions?.[0]?.embeddings;
+  // Vertex counts the tokens; AI Studio's :embedContent answer has no counts.
+  const tokens = prediction?.statistics?.token_count;
+  logCall(id, via, startedAt, `HTTP ${res.status}${typeof tokens === 'number' ? `, tokens ${tokens}` : ''}`, true);
+  const values = vertex ? prediction?.values : data?.embedding?.values;
   if (!isNumberArray(values)) throw new Error('embed: unexpected response shape');
   return values;
 }
